@@ -106,7 +106,7 @@ We will build a scalable, real-time web application that predicts NBA team ranki
 
 ## 4. Architecture
 
-![Sys Diagram](system_diagram_nba.png "System Diagram")
+![Sys Diagram](sys_diagram_nba.png "System Diagram")
 
 ---
 
