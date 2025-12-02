@@ -1,0 +1,549 @@
+"""
+FastAPI Backend API for NBA Analytics Platform.
+Serves data to the dashboard and external clients.
+"""
+import logging
+from datetime import date, datetime
+from typing import List, Optional, Dict, Any
+
+from fastapi import FastAPI, HTTPException, Depends, Query, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+from sqlalchemy import func, desc
+
+from config import config
+from models.database_models import Team, Player, Game, PlayerGameStats, TeamStanding
+from models.database import db_manager
+from services.cache import cache_manager
+from services.data_ingestion import ingestion_service
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+# Pydantic models for API responses
+class TeamResponse(BaseModel):
+    id: int
+    nba_id: int
+    abbreviation: str
+    name: str
+    city: Optional[str]
+    conference: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+
+class PlayerResponse(BaseModel):
+    id: int
+    nba_id: int
+    full_name: str
+    team_id: Optional[int]
+    position: Optional[str]
+    jersey_number: Optional[str]
+    height: Optional[str]
+    weight: Optional[int]
+    is_active: bool
+    
+    class Config:
+        from_attributes = True
+
+
+class StandingResponse(BaseModel):
+    team_id: int
+    team_name: str
+    team_abbr: str
+    conference: str
+    wins: int
+    losses: int
+    win_pct: float
+    conf_rank: Optional[int]
+    games_back: float
+    streak: Optional[str]
+    last_10: Optional[str]
+
+
+class StandingsResponse(BaseModel):
+    season: str
+    updated_at: str
+    east: List[StandingResponse]
+    west: List[StandingResponse]
+
+
+class GameTeamInfo(BaseModel):
+    id: int
+    name: str
+    abbr: str
+    score: int
+
+
+class GameResponse(BaseModel):
+    game_id: str
+    home_team: GameTeamInfo
+    away_team: GameTeamInfo
+    status: str
+    period: Optional[int]
+    clock: Optional[str]
+    game_date: Optional[str]
+
+
+class PlayerStatsResponse(BaseModel):
+    player_id: int
+    player_name: str
+    team_abbr: str
+    minutes: float
+    points: int
+    rebounds: int
+    assists: int
+    steals: int
+    blocks: int
+    turnovers: int
+    fg_pct: Optional[float]
+    three_pct: Optional[float]
+    ft_pct: Optional[float]
+    plus_minus: int
+
+
+class HealthResponse(BaseModel):
+    status: str
+    database: bool
+    cache: bool
+    timestamp: str
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="NBA Analytics API",
+    description="Real-time NBA statistics and analytics platform",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.api.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Dependency for database session
+def get_db() -> Session:
+    """Get database session."""
+    session = db_manager.session_factory()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+# Health check endpoints
+@app.get("/health", response_model=HealthResponse, tags=["Health"])
+def health_check():
+    """Check the health status of the API and its dependencies."""
+    db_ok = db_manager.check_connection()
+    cache_ok = cache_manager.check_connection()
+    
+    return HealthResponse(
+        status="healthy" if db_ok and cache_ok else "degraded",
+        database=db_ok,
+        cache=cache_ok,
+        timestamp=datetime.utcnow().isoformat()
+    )
+
+
+@app.get("/", tags=["Health"])
+def root():
+    """API root endpoint."""
+    return {
+        "message": "NBA Analytics API",
+        "version": "1.0.0",
+        "docs": "/docs"
+    }
+
+
+# Team endpoints
+@app.get("/api/teams", response_model=List[TeamResponse], tags=["Teams"])
+def get_teams(
+    conference: Optional[str] = Query(None, description="Filter by conference (East/West)"),
+    db: Session = Depends(get_db)
+):
+    """Get all NBA teams."""
+    query = db.query(Team)
+    
+    if conference:
+        query = query.filter(Team.conference == conference)
+    
+    teams = query.order_by(Team.name).all()
+    return teams
+
+
+@app.get("/api/teams/{team_id}", response_model=TeamResponse, tags=["Teams"])
+def get_team(team_id: int, db: Session = Depends(get_db)):
+    """Get a specific team by ID."""
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    return team
+
+
+# Player endpoints
+@app.get("/api/players", response_model=List[PlayerResponse], tags=["Players"])
+def get_players(
+    team_id: Optional[int] = Query(None, description="Filter by team ID"),
+    active_only: bool = Query(True, description="Only show active players"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """Get NBA players with optional filtering."""
+    query = db.query(Player)
+    
+    if team_id:
+        query = query.filter(Player.team_id == team_id)
+    
+    if active_only:
+        query = query.filter(Player.is_active == True)
+    
+    players = query.order_by(Player.full_name).offset(offset).limit(limit).all()
+    return players
+
+
+@app.get("/api/players/{player_id}", response_model=PlayerResponse, tags=["Players"])
+def get_player(player_id: int, db: Session = Depends(get_db)):
+    """Get a specific player by ID."""
+    player = db.query(Player).filter(Player.id == player_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return player
+
+
+# Standings endpoints
+@app.get("/api/standings", response_model=StandingsResponse, tags=["Standings"])
+def get_standings(
+    season: str = Query(default=None, description="Season (e.g., '2024-25')"),
+    db: Session = Depends(get_db)
+):
+    """Get current NBA standings by conference."""
+    season = season or config.ingestion.current_season
+    
+    # Try cache first
+    cached = cache_manager.get_standings(season)
+    if cached:
+        # Format cached data
+        standings = cached.get('standings', [])
+        east = [s for s in standings if s.get('conference') == 'East']
+        west = [s for s in standings if s.get('conference') == 'West']
+        
+        east.sort(key=lambda x: x.get('conf_rank') or 999)
+        west.sort(key=lambda x: x.get('conf_rank') or 999)
+        
+        return StandingsResponse(
+            season=season,
+            updated_at=cached.get('updated_at', ''),
+            east=[StandingResponse(**s) for s in east],
+            west=[StandingResponse(**s) for s in west]
+        )
+    
+    # Query database
+    standings_query = db.query(
+        TeamStanding,
+        Team
+    ).join(Team).filter(TeamStanding.season == season)
+    
+    standings_data = standings_query.all()
+    
+    east = []
+    west = []
+    
+    for standing, team in standings_data:
+        record = StandingResponse(
+            team_id=team.id,
+            team_name=team.name,
+            team_abbr=team.abbreviation,
+            conference=team.conference or '',
+            wins=standing.wins,
+            losses=standing.losses,
+            win_pct=standing.win_percentage,
+            conf_rank=standing.conference_rank,
+            games_back=standing.games_back,
+            streak=standing.current_streak,
+            last_10=standing.last_10
+        )
+        
+        if team.conference == 'East':
+            east.append(record)
+        else:
+            west.append(record)
+    
+    east.sort(key=lambda x: x.conf_rank or 999)
+    west.sort(key=lambda x: x.conf_rank or 999)
+    
+    return StandingsResponse(
+        season=season,
+        updated_at=datetime.utcnow().isoformat(),
+        east=east,
+        west=west
+    )
+
+
+# Games endpoints
+@app.get("/api/games/today", response_model=List[GameResponse], tags=["Games"])
+def get_todays_games(db: Session = Depends(get_db)):
+    """Get today's NBA games."""
+    # Try cache first
+    cached = cache_manager.get_todays_games()
+    if cached:
+        return [GameResponse(**g) for g in cached]
+    
+    # Query database
+    today = date.today()
+    games = db.query(Game).filter(Game.game_date == today).all()
+    
+    result = []
+    for game in games:
+        result.append(GameResponse(
+            game_id=game.nba_game_id,
+            home_team=GameTeamInfo(
+                id=game.home_team.id,
+                name=game.home_team.name,
+                abbr=game.home_team.abbreviation,
+                score=game.home_score or 0
+            ),
+            away_team=GameTeamInfo(
+                id=game.away_team.id,
+                name=game.away_team.name,
+                abbr=game.away_team.abbreviation,
+                score=game.away_score or 0
+            ),
+            status=game.status,
+            period=game.period,
+            clock=game.game_clock,
+            game_date=str(game.game_date)
+        ))
+    
+    return result
+
+
+@app.get("/api/games/recent", response_model=List[GameResponse], tags=["Games"])
+def get_recent_games(
+    days: int = Query(7, ge=1, le=30, description="Number of days to look back"),
+    team_id: Optional[int] = Query(None, description="Filter by team"),
+    db: Session = Depends(get_db)
+):
+    """Get recent games from the past N days."""
+    from datetime import timedelta
+    
+    start_date = date.today() - timedelta(days=days)
+    
+    query = db.query(Game).filter(
+        Game.game_date >= start_date,
+        Game.status == 'final'
+    )
+    
+    if team_id:
+        query = query.filter(
+            (Game.home_team_id == team_id) | (Game.away_team_id == team_id)
+        )
+    
+    games = query.order_by(desc(Game.game_date)).limit(50).all()
+    
+    result = []
+    for game in games:
+        result.append(GameResponse(
+            game_id=game.nba_game_id,
+            home_team=GameTeamInfo(
+                id=game.home_team.id,
+                name=game.home_team.name,
+                abbr=game.home_team.abbreviation,
+                score=game.home_score or 0
+            ),
+            away_team=GameTeamInfo(
+                id=game.away_team.id,
+                name=game.away_team.name,
+                abbr=game.away_team.abbreviation,
+                score=game.away_score or 0
+            ),
+            status=game.status,
+            period=game.period,
+            clock=game.game_clock,
+            game_date=str(game.game_date)
+        ))
+    
+    return result
+
+
+# Statistics endpoints
+@app.get("/api/stats/leaders", response_model=List[PlayerStatsResponse], tags=["Statistics"])
+def get_stat_leaders(
+    stat: str = Query("points", description="Stat to rank by (points, rebounds, assists, steals, blocks)"),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    """Get statistical leaders for a given category."""
+    stat_column_map = {
+        "points": PlayerGameStats.points,
+        "rebounds": PlayerGameStats.total_rebounds,
+        "assists": PlayerGameStats.assists,
+        "steals": PlayerGameStats.steals,
+        "blocks": PlayerGameStats.blocks,
+    }
+    
+    if stat not in stat_column_map:
+        raise HTTPException(status_code=400, detail=f"Invalid stat: {stat}")
+    
+    stat_column = stat_column_map[stat]
+    
+    # Get average stats per game
+    subquery = db.query(
+        PlayerGameStats.player_id,
+        func.avg(PlayerGameStats.points).label('avg_points'),
+        func.avg(PlayerGameStats.total_rebounds).label('avg_rebounds'),
+        func.avg(PlayerGameStats.assists).label('avg_assists'),
+        func.avg(PlayerGameStats.steals).label('avg_steals'),
+        func.avg(PlayerGameStats.blocks).label('avg_blocks'),
+        func.avg(PlayerGameStats.turnovers).label('avg_turnovers'),
+        func.avg(PlayerGameStats.minutes_played).label('avg_minutes'),
+        func.avg(PlayerGameStats.plus_minus).label('avg_plus_minus'),
+        func.sum(PlayerGameStats.field_goals_made).label('total_fgm'),
+        func.sum(PlayerGameStats.field_goals_attempted).label('total_fga'),
+        func.sum(PlayerGameStats.three_pointers_made).label('total_3pm'),
+        func.sum(PlayerGameStats.three_pointers_attempted).label('total_3pa'),
+        func.sum(PlayerGameStats.free_throws_made).label('total_ftm'),
+        func.sum(PlayerGameStats.free_throws_attempted).label('total_fta'),
+        func.count(PlayerGameStats.id).label('games_played')
+    ).group_by(PlayerGameStats.player_id).having(
+        func.count(PlayerGameStats.id) >= 5  # Minimum games played
+    ).subquery()
+    
+    # Join with player info
+    results = db.query(
+        Player,
+        Team,
+        subquery
+    ).join(
+        subquery, Player.id == subquery.c.player_id
+    ).join(
+        Team, Player.team_id == Team.id
+    ).order_by(
+        desc(getattr(subquery.c, f'avg_{stat}'))
+    ).limit(limit).all()
+    
+    leaders = []
+    for player, team, stats in results:
+        fg_pct = None
+        if stats.total_fga and stats.total_fga > 0:
+            fg_pct = round(stats.total_fgm / stats.total_fga * 100, 1)
+        
+        three_pct = None
+        if stats.total_3pa and stats.total_3pa > 0:
+            three_pct = round(stats.total_3pm / stats.total_3pa * 100, 1)
+        
+        ft_pct = None
+        if stats.total_fta and stats.total_fta > 0:
+            ft_pct = round(stats.total_ftm / stats.total_fta * 100, 1)
+        
+        leaders.append(PlayerStatsResponse(
+            player_id=player.id,
+            player_name=player.full_name,
+            team_abbr=team.abbreviation,
+            minutes=round(stats.avg_minutes or 0, 1),
+            points=round(stats.avg_points or 0),
+            rebounds=round(stats.avg_rebounds or 0),
+            assists=round(stats.avg_assists or 0),
+            steals=round(stats.avg_steals or 0),
+            blocks=round(stats.avg_blocks or 0),
+            turnovers=round(stats.avg_turnovers or 0),
+            fg_pct=fg_pct,
+            three_pct=three_pct,
+            ft_pct=ft_pct,
+            plus_minus=round(stats.avg_plus_minus or 0)
+        ))
+    
+    return leaders
+
+
+@app.get("/api/stats/player/{player_id}", tags=["Statistics"])
+def get_player_game_stats(
+    player_id: int,
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    """Get recent game stats for a specific player."""
+    stats = db.query(
+        PlayerGameStats,
+        Game,
+        Team
+    ).join(Game).join(Team, PlayerGameStats.team_id == Team.id).filter(
+        PlayerGameStats.player_id == player_id
+    ).order_by(desc(Game.game_date)).limit(limit).all()
+    
+    result = []
+    for stat, game, team in stats:
+        result.append({
+            "game_date": str(game.game_date),
+            "opponent": game.away_team.abbreviation if game.home_team_id == team.id else game.home_team.abbreviation,
+            "minutes": stat.minutes_played,
+            "points": stat.points,
+            "rebounds": stat.total_rebounds,
+            "assists": stat.assists,
+            "steals": stat.steals,
+            "blocks": stat.blocks,
+            "turnovers": stat.turnovers,
+            "fg": f"{stat.field_goals_made}/{stat.field_goals_attempted}",
+            "fg_pct": stat.field_goal_percentage,
+            "three_pt": f"{stat.three_pointers_made}/{stat.three_pointers_attempted}",
+            "three_pct": stat.three_point_percentage,
+            "plus_minus": stat.plus_minus
+        })
+    
+    return result
+
+
+# Data refresh endpoints
+@app.post("/api/refresh/standings", tags=["Admin"])
+async def refresh_standings(background_tasks: BackgroundTasks):
+    """Trigger a refresh of standings data."""
+    background_tasks.add_task(
+        ingestion_service.ingest_standings,
+        config.ingestion.current_season
+    )
+    return {"message": "Standings refresh started"}
+
+
+@app.post("/api/refresh/games", tags=["Admin"])
+async def refresh_games(background_tasks: BackgroundTasks):
+    """Trigger a refresh of today's games."""
+    background_tasks.add_task(ingestion_service.ingest_todays_games)
+    return {"message": "Games refresh started"}
+
+
+@app.post("/api/refresh/full", tags=["Admin"])
+async def refresh_full(background_tasks: BackgroundTasks):
+    """Trigger a full data refresh."""
+    background_tasks.add_task(ingestion_service.run_full_ingestion)
+    return {"message": "Full data refresh started"}
+
+
+# Run with uvicorn
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Initialize database tables
+    from models.database import init_database
+    init_database()
+    
+    uvicorn.run(
+        "api.main:app",
+        host=config.api.host,
+        port=config.api.port,
+        reload=config.api.debug
+    )
