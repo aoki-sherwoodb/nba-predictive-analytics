@@ -342,24 +342,53 @@ class NBADataIngestionService:
             
             try:
                 # Fetch today's scoreboard
-                scoreboard = scoreboardv2.ScoreboardV2(
-                    game_date=date.today().strftime('%Y-%m-%d'),
-                    league_id='00'
-                )
-                scoreboard_data = scoreboard.get_normalized_dict()
-                
+                # Note: The NBA API has a known bug where WinProbability field is sometimes missing
+                # This causes the ScoreboardV2 constructor to fail during load_response()
+                try:
+                    scoreboard = scoreboardv2.ScoreboardV2(
+                        game_date=date.today().strftime('%Y-%m-%d'),
+                        league_id='00'
+                    )
+                    scoreboard_data = scoreboard.get_normalized_dict()
+                except KeyError as ke:
+                    # The NBA API library failed during initialization due to missing field
+                    logger.warning(f"NBA API library bug: missing field '{ke}' in response. This is a known issue with the nba_api library.")
+                    logger.info("Today's games ingestion skipped due to NBA API library limitation.")
+                    logger.info("Workaround: The library needs to be patched or wait for NBA to fix their API response.")
+                    self._log_ingestion_complete(session, log, 0, f"NBA API bug: missing {ke}")
+                    return 0
+
+                logger.debug(f"Scoreboard data keys: {scoreboard_data.keys()}")
+                game_headers = scoreboard_data.get('GameHeader', [])
+                logger.info(f"Found {len(game_headers)} games for today")
+
+                if len(game_headers) == 0:
+                    logger.info("No games scheduled for today")
+                    self._log_ingestion_complete(session, log, 0)
+                    return 0
+
                 count = 0
                 games_list = []
-                
-                for game_data in scoreboard_data.get('GameHeader', []):
-                    game_id = game_data['GAME_ID']
-                    
+
+                for game_data in game_headers:
+                    game_id = game_data.get('GAME_ID')
+                    if not game_id:
+                        logger.warning("Game data missing GAME_ID, skipping")
+                        continue
+
                     # Get teams
+                    home_team_id = game_data.get('HOME_TEAM_ID')
+                    away_team_id = game_data.get('VISITOR_TEAM_ID')
+
+                    if not home_team_id or not away_team_id:
+                        logger.warning(f"Game {game_id} missing team IDs, skipping")
+                        continue
+
                     home_team = session.query(Team).filter(
-                        Team.nba_id == game_data['HOME_TEAM_ID']
+                        Team.nba_id == home_team_id
                     ).first()
                     away_team = session.query(Team).filter(
-                        Team.nba_id == game_data['VISITOR_TEAM_ID']
+                        Team.nba_id == away_team_id
                     ).first()
                     
                     if not home_team or not away_team:
@@ -378,10 +407,13 @@ class NBADataIngestionService:
                     home_score = 0
                     away_score = 0
                     for line in scoreboard_data.get('LineScore', []):
-                        if line['GAME_ID'] == game_id:
-                            if line['TEAM_ID'] == game_data['HOME_TEAM_ID']:
+                        line_game_id = line.get('GAME_ID')
+                        line_team_id = line.get('TEAM_ID')
+
+                        if line_game_id == game_id and line_team_id:
+                            if line_team_id == home_team_id:
                                 home_score = line.get('PTS', 0) or 0
-                            elif line['TEAM_ID'] == game_data['VISITOR_TEAM_ID']:
+                            elif line_team_id == away_team_id:
                                 away_score = line.get('PTS', 0) or 0
                     
                     # Upsert game
@@ -439,9 +471,10 @@ class NBADataIngestionService:
                 return count
                 
             except Exception as e:
-                logger.error(f"Today's games ingestion failed: {e}")
+                logger.error(f"Today's games ingestion failed: {e}", exc_info=True)
                 self._log_ingestion_complete(session, log, 0, str(e))
-                raise
+                # Don't raise - continue with ingestion even if no games today
+                return 0
     
     def ingest_game_box_score(self, game_id: str) -> int:
         """

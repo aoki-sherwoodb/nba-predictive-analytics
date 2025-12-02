@@ -9,9 +9,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, date
 import time
+import os
 
 # Configuration
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Page configuration
 st.set_page_config(
