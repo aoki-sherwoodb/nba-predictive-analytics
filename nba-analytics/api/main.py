@@ -533,6 +533,168 @@ async def refresh_full(background_tasks: BackgroundTasks):
     return {"message": "Full data refresh started"}
 
 
+# Prediction endpoints
+from services.prediction_service import prediction_service
+
+
+class TeamPredictionResponse(BaseModel):
+    """Response model for team predictions."""
+    team_id: int
+    team_name: str
+    team_abbr: str
+    conference: Optional[str]
+    predicted_wins: float
+    predicted_losses: float
+    predicted_win_pct: float
+    predicted_conference_rank: int
+    playoff_probability: float
+    predicted_ppg: float
+    predicted_oppg: float
+    predicted_pace: float
+    predicted_defensive_rating: float
+    wins_lower_bound: Optional[float] = None
+    wins_upper_bound: Optional[float] = None
+
+
+class AllPredictionsResponse(BaseModel):
+    """Response model for all team predictions."""
+    season: str
+    prediction_date: Optional[str]
+    model_version: Optional[str]
+    model_mae_wins: Optional[float]
+    east: List[TeamPredictionResponse]
+    west: List[TeamPredictionResponse]
+
+
+class PredictionComparisonItem(BaseModel):
+    """Single team prediction vs actual comparison."""
+    team_id: int
+    team_abbr: str
+    conference: Optional[str]
+    predicted_wins: float
+    actual_wins: int
+    wins_diff: float
+    predicted_rank: int
+    actual_rank: Optional[int]
+    rank_diff: int
+    playoff_probability: float
+
+
+class PredictionComparisonResponse(BaseModel):
+    """Response model for prediction vs actual comparison."""
+    season: str
+    prediction_date: Optional[str]
+    comparisons: List[PredictionComparisonItem]
+
+
+class ModelInfoResponse(BaseModel):
+    """Response model for model metadata."""
+    model_version: str
+    model_type: str
+    trained_at: Optional[str]
+    training_seasons: Optional[List[str]]
+    epochs_trained: Optional[int]
+    validation_loss: Optional[float]
+    mae_wins: Optional[float]
+    mae_ppg: Optional[float]
+    is_active: bool
+
+
+@app.get("/api/predictions", response_model=AllPredictionsResponse, tags=["Predictions"])
+def get_all_predictions(
+    season: str = Query(default=None, description="Season (e.g., '2025-26')")
+):
+    """Get end-of-season predictions for all teams."""
+    predictions = prediction_service.get_all_predictions(season)
+
+    if not predictions:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No predictions found for season {season or config.ingestion.current_season}"
+        )
+
+    return AllPredictionsResponse(
+        season=predictions["season"],
+        prediction_date=predictions.get("prediction_date"),
+        model_version=predictions.get("model_version"),
+        model_mae_wins=predictions.get("model_mae_wins"),
+        east=[TeamPredictionResponse(**p) for p in predictions["east"]],
+        west=[TeamPredictionResponse(**p) for p in predictions["west"]],
+    )
+
+
+@app.get("/api/predictions/{team_id}", tags=["Predictions"])
+def get_team_prediction(
+    team_id: int,
+    season: str = Query(default=None, description="Season (e.g., '2025-26')")
+):
+    """Get predictions for a specific team."""
+    prediction = prediction_service.get_team_prediction(team_id, season)
+
+    if not prediction:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No prediction found for team {team_id}"
+        )
+
+    return prediction
+
+
+@app.get("/api/predictions/comparison", response_model=PredictionComparisonResponse, tags=["Predictions"])
+def get_predictions_vs_actual(
+    season: str = Query(default=None, description="Season (e.g., '2025-26')")
+):
+    """Compare predictions to current actual standings."""
+    comparison = prediction_service.get_predictions_vs_actual(season)
+
+    if not comparison:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No comparison data available for season {season or config.ingestion.current_season}"
+        )
+
+    return PredictionComparisonResponse(
+        season=comparison["season"],
+        prediction_date=comparison.get("prediction_date"),
+        comparisons=[PredictionComparisonItem(**c) for c in comparison["comparisons"]],
+    )
+
+
+@app.get("/api/predictions/model/info", response_model=ModelInfoResponse, tags=["Predictions"])
+def get_model_info():
+    """Get information about the active prediction model."""
+    info = prediction_service.get_model_info()
+
+    if not info:
+        raise HTTPException(
+            status_code=404,
+            detail="No active model found"
+        )
+
+    return ModelInfoResponse(**info)
+
+
+@app.post("/api/predictions/refresh", tags=["Admin"])
+async def refresh_predictions(background_tasks: BackgroundTasks):
+    """Trigger fresh prediction generation."""
+    background_tasks.add_task(
+        prediction_service.generate_fresh_predictions,
+        config.ingestion.current_season
+    )
+    return {"message": "Prediction refresh started"}
+
+
+@app.post("/api/model/retrain", tags=["Admin"])
+async def retrain_model(background_tasks: BackgroundTasks):
+    """Trigger model retraining with latest data."""
+    from ml.training_pipeline import training_pipeline
+    from datetime import datetime
+
+    version = f"lstm_v{datetime.now().strftime('%Y%m%d_%H%M')}"
+    background_tasks.add_task(training_pipeline.train_and_save, version)
+    return {"message": f"Model retraining started. Version: {version}"}
+
+
 # Run with uvicorn
 if __name__ == "__main__":
     import uvicorn

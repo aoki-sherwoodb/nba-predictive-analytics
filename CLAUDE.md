@@ -83,12 +83,16 @@ python -m services.cache    # Test Redis connection
 
 ### Key Components
 
-- **api/main.py** (549 lines) - FastAPI REST endpoints with Pydantic models, CORS middleware, cache-first queries
-- **dashboard/app.py** (557 lines) - Streamlit web UI with Plotly charts and custom styling
-- **models/database_models.py** (233 lines) - 6 SQLAlchemy ORM models: Team, Player, Game, PlayerGameStats, TeamStanding, IngestionLog
-- **services/data_ingestion.py** (630 lines) - ETL from NBA API with rate limiting and upsert logic
-- **services/cache.py** (228 lines) - Redis caching with key prefixes and configurable TTLs
-- **config.py** (84 lines) - 12-factor configuration via environment variables
+- **api/main.py** - FastAPI REST endpoints with Pydantic models, CORS middleware, cache-first queries
+- **dashboard/app.py** - Streamlit web UI with Plotly charts, 5 tabs including Predictions
+- **models/database_models.py** - SQLAlchemy ORM models: Team, Player, Game, PlayerGameStats, TeamStanding, IngestionLog
+- **models/prediction_models.py** - ML models: TeamSeasonStats, TeamPrediction, ModelMetadata
+- **services/data_ingestion.py** - ETL from NBA API with rate limiting and upsert logic
+- **services/historical_ingestion.py** - Historical data ingestion for LSTM training (5 seasons)
+- **services/prediction_service.py** - Prediction retrieval and generation service
+- **services/cache.py** - Redis caching with key prefixes and configurable TTLs
+- **ml/** - PyTorch LSTM model, data preprocessor, and training pipeline
+- **config.py** - 12-factor configuration via environment variables
 
 ### Data Flow Pattern
 
@@ -104,7 +108,7 @@ DB_HOST=localhost, DB_PORT=5432, DB_NAME=nba_analytics, DB_USER=postgres, DB_PAS
 REDIS_HOST=localhost, REDIS_PORT=6379
 API_HOST=0.0.0.0, API_PORT=8000, API_DEBUG=false
 CORS_ORIGINS=http://localhost:8501,http://localhost:3000
-CURRENT_SEASON=2024-25
+CURRENT_SEASON=2025-26
 ```
 
 ## Code Patterns
@@ -115,8 +119,34 @@ CURRENT_SEASON=2024-25
 - **Upserts:** PostgreSQL INSERT ON CONFLICT DO UPDATE pattern throughout ingestion
 - **Type hints:** Full annotations on all functions (Python 3.10+ style)
 
+## ML Predictions
+
+The platform includes LSTM-based end-of-season predictions:
+
+### Training the Model
+```bash
+# Ingest 5 seasons of historical data
+python -m services.historical_ingestion
+
+# Train LSTM model
+python -m ml.training_pipeline
+```
+
+### Prediction API Endpoints
+- `GET /api/predictions` - All team predictions
+- `GET /api/predictions/{team_id}` - Single team prediction
+- `GET /api/predictions/comparison` - Predictions vs actual standings
+- `POST /api/predictions/refresh` - Generate fresh predictions
+- `POST /api/model/retrain` - Trigger model retraining
+
+### LSTM Architecture
+- Input: 10 time steps x 20 features per step
+- 2-layer LSTM (64 hidden units) with dropout
+- Output: 9 predictions (wins, losses, win%, rank, playoff prob, PPG, OPPG, pace, def rating)
+- Training on 5 seasons (2020-2025)
+
 ## Known Issues
 
 1. **NBA API bug:** `nba_api` library throws KeyError on missing fields in live game responses. Workaround in `data_ingestion.py` lines 347-359 gracefully skips today's games.
 2. **No migrations:** Database uses auto-creation; Alembic planned for production.
-3. **No auth:** Admin endpoints (POST /api/refresh/*) are unprotected.
+3. **No auth:** Admin endpoints (POST /api/refresh/*, /api/model/*) are unprotected.

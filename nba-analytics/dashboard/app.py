@@ -132,6 +132,18 @@ def get_player_stats(player_id: int):
     return api_get(f"/api/stats/player/{player_id}")
 
 
+@st.cache_data(ttl=300)
+def get_predictions():
+    """Get end-of-season predictions for all teams."""
+    return api_get("/api/predictions")
+
+
+@st.cache_data(ttl=3600)
+def get_model_info():
+    """Get active prediction model info."""
+    return api_get("/api/predictions/model/info")
+
+
 def check_api_health():
     """Check if API is healthy."""
     health = api_get("/health")
@@ -159,7 +171,7 @@ def render_sidebar():
         
         page = st.radio(
             "Select Page",
-            ["📊 Standings", "🎮 Today's Games", "🏆 Leaders", "📈 Team Analysis"],
+            ["📊 Standings", "🎮 Today's Games", "🏆 Leaders", "📈 Team Analysis", "🔮 Predictions"],
             label_visibility="collapsed"
         )
         
@@ -537,6 +549,253 @@ def render_team_analysis():
         st.info("No recent games found for this team.")
 
 
+def render_predictions():
+    """Render the predictions page with LSTM forecasts."""
+    st.markdown('<h2 class="sub-header">End-of-Season Predictions</h2>', unsafe_allow_html=True)
+
+    predictions = get_predictions()
+
+    if not predictions:
+        st.warning(
+            "No predictions available. The LSTM model may need to be trained first. "
+            "Use the Admin API to trigger model training."
+        )
+        return
+
+    # Model info expander
+    model_info = get_model_info()
+    if model_info:
+        with st.expander("Model Information"):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Model Version", model_info.get("model_version", "N/A"))
+            with col2:
+                mae = model_info.get("mae_wins")
+                st.metric("Wins MAE", f"{mae:.2f}" if mae else "N/A")
+            with col3:
+                st.metric("Training Seasons", len(model_info.get("training_seasons", [])))
+
+    st.caption(f"Predictions generated: {predictions.get('prediction_date', 'Unknown')}")
+
+    # Create tabs for different views
+    tab1, tab2, tab3 = st.tabs([
+        "Conference Rankings",
+        "Playoff Probabilities",
+        "Statistical Forecasts"
+    ])
+
+    with tab1:
+        render_predicted_rankings(predictions)
+
+    with tab2:
+        render_playoff_probabilities(predictions)
+
+    with tab3:
+        render_stat_forecasts(predictions)
+
+
+def render_predicted_rankings(predictions: dict):
+    """Display predicted conference rankings."""
+    standings = get_standings()
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### Eastern Conference")
+        if predictions.get('east'):
+            # Get actual standings for comparison
+            actual_east = {s['team_abbr']: s for s in standings.get('east', [])} if standings else {}
+
+            east_data = []
+            for p in predictions['east']:
+                actual = actual_east.get(p['team_abbr'], {})
+                east_data.append({
+                    'Rank': p.get('predicted_conference_rank', '-'),
+                    'Team': p['team_abbr'],
+                    'Pred W': round(p['predicted_wins']),
+                    'Pred L': round(p['predicted_losses']),
+                    'Actual W': actual.get('wins', '-'),
+                    'Playoff %': f"{p['playoff_probability'] * 100:.0f}%",
+                })
+
+            st.dataframe(
+                pd.DataFrame(east_data),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No Eastern Conference predictions")
+
+    with col2:
+        st.markdown("### Western Conference")
+        if predictions.get('west'):
+            actual_west = {s['team_abbr']: s for s in standings.get('west', [])} if standings else {}
+
+            west_data = []
+            for p in predictions['west']:
+                actual = actual_west.get(p['team_abbr'], {})
+                west_data.append({
+                    'Rank': p.get('predicted_conference_rank', '-'),
+                    'Team': p['team_abbr'],
+                    'Pred W': round(p['predicted_wins']),
+                    'Pred L': round(p['predicted_losses']),
+                    'Actual W': actual.get('wins', '-'),
+                    'Playoff %': f"{p['playoff_probability'] * 100:.0f}%",
+                })
+
+            st.dataframe(
+                pd.DataFrame(west_data),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No Western Conference predictions")
+
+    # Predicted vs Actual Wins Chart
+    st.markdown("### Predicted vs Current Wins")
+    all_predictions = predictions.get('east', []) + predictions.get('west', [])
+
+    if all_predictions and standings:
+        all_standings = standings.get('east', []) + standings.get('west', [])
+        standings_map = {s['team_abbr']: s['wins'] for s in all_standings}
+
+        fig = go.Figure()
+
+        teams = [p['team_abbr'] for p in all_predictions]
+        pred_wins = [p['predicted_wins'] for p in all_predictions]
+        actual_wins = [standings_map.get(t, 0) for t in teams]
+
+        fig.add_trace(go.Bar(
+            name='Predicted Wins',
+            x=teams,
+            y=pred_wins,
+            marker_color='#667eea'
+        ))
+
+        fig.add_trace(go.Bar(
+            name='Current Wins',
+            x=teams,
+            y=actual_wins,
+            marker_color='#48bb78'
+        ))
+
+        fig.update_layout(
+            barmode='group',
+            xaxis_tickangle=-45,
+            height=500,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+
+def render_playoff_probabilities(predictions: dict):
+    """Display playoff probability visualizations."""
+    st.markdown("### Playoff Qualification Probabilities")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### Eastern Conference")
+        east = sorted(
+            predictions.get('east', []),
+            key=lambda x: x.get('playoff_probability', 0),
+            reverse=True
+        )
+
+        if east:
+            fig = px.bar(
+                x=[t['team_abbr'] for t in east],
+                y=[t['playoff_probability'] * 100 for t in east],
+                color=[t['playoff_probability'] for t in east],
+                color_continuous_scale='RdYlGn',
+                labels={'x': 'Team', 'y': 'Probability (%)'}
+            )
+            fig.update_layout(showlegend=False, height=400, coloraxis_showscale=False)
+            fig.add_hline(y=50, line_dash="dash", line_color="gray",
+                          annotation_text="50%", annotation_position="right")
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        st.markdown("#### Western Conference")
+        west = sorted(
+            predictions.get('west', []),
+            key=lambda x: x.get('playoff_probability', 0),
+            reverse=True
+        )
+
+        if west:
+            fig = px.bar(
+                x=[t['team_abbr'] for t in west],
+                y=[t['playoff_probability'] * 100 for t in west],
+                color=[t['playoff_probability'] for t in west],
+                color_continuous_scale='RdYlGn',
+                labels={'x': 'Team', 'y': 'Probability (%)'}
+            )
+            fig.update_layout(showlegend=False, height=400, coloraxis_showscale=False)
+            fig.add_hline(y=50, line_dash="dash", line_color="gray",
+                          annotation_text="50%", annotation_position="right")
+            st.plotly_chart(fig, use_container_width=True)
+
+
+def render_stat_forecasts(predictions: dict):
+    """Display predicted statistical metrics for teams."""
+    st.markdown("### Predicted Season Statistics")
+
+    all_teams = predictions.get('east', []) + predictions.get('west', [])
+    team_options = {f"{t['team_abbr']} - {t['team_name']}": t for t in all_teams}
+
+    if not team_options:
+        st.info("No team predictions available")
+        return
+
+    selected = st.selectbox("Select Team", options=list(team_options.keys()))
+    team = team_options[selected]
+
+    # Display predicted stats in metrics
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Predicted Wins", f"{team['predicted_wins']:.0f}")
+        st.metric("Win %", f"{team['predicted_win_pct']:.1%}")
+
+    with col2:
+        st.metric("Predicted PPG", f"{team['predicted_ppg']:.1f}")
+        st.metric("Predicted OPPG", f"{team['predicted_oppg']:.1f}")
+
+    with col3:
+        st.metric("Predicted Pace", f"{team['predicted_pace']:.1f}")
+        st.metric("Def Rating", f"{team['predicted_defensive_rating']:.1f}")
+
+    with col4:
+        st.metric("Conf Rank", f"#{team['predicted_conference_rank']}")
+        prob_pct = team['playoff_probability'] * 100
+        st.metric("Playoff Prob", f"{prob_pct:.0f}%")
+
+    # Offensive vs Defensive scatter plot
+    st.markdown("### Team Efficiency: Offense vs Defense")
+
+    fig = px.scatter(
+        x=[t['predicted_ppg'] for t in all_teams],
+        y=[t['predicted_oppg'] for t in all_teams],
+        text=[t['team_abbr'] for t in all_teams],
+        color=[t['playoff_probability'] for t in all_teams],
+        color_continuous_scale='RdYlGn',
+        labels={'x': 'Predicted PPG (Offense)', 'y': 'Predicted OPPG (Defense)', 'color': 'Playoff Prob'}
+    )
+    fig.update_traces(textposition='top center', marker_size=12)
+    fig.update_layout(height=500)
+
+    # Add quadrant lines at averages
+    if all_teams:
+        avg_ppg = sum(t['predicted_ppg'] for t in all_teams) / len(all_teams)
+        avg_oppg = sum(t['predicted_oppg'] for t in all_teams) / len(all_teams)
+        fig.add_hline(y=avg_oppg, line_dash="dash", line_color="gray", opacity=0.5)
+        fig.add_vline(x=avg_ppg, line_dash="dash", line_color="gray", opacity=0.5)
+
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption("Teams in upper-right (high PPG, low OPPG) are predicted to be most successful.")
+
+
 # Main application
 def main():
     """Main application entry point."""
@@ -551,6 +810,8 @@ def main():
         render_leaders()
     elif page == "📈 Team Analysis":
         render_team_analysis()
+    elif page == "🔮 Predictions":
+        render_predictions()
 
 
 if __name__ == "__main__":
