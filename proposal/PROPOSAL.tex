@@ -1,0 +1,550 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{booktabs}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+}
+
+\title{\textbf{Real-time NBA Player, Game, and Season Analytics}}
+\author{
+    Ben Aoki-Sherwood\thanks{\url{https://github.com/aoki-sherwoodb}} \and
+    Arjun Rao\thanks{\url{https://github.com/arjunarao619}}
+}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Project Goals}
+
+We will build a scalable, real-time web application that predicts NBA team rankings and playoff probabilities using statistical and machine learning models. The system will:
+
+\begin{enumerate}[label=\arabic*.]
+    \item \textbf{Real-time data ingestion and updates}: Periodically collect current NBA game results and team and player statistics from the \href{https://site.web.api.espn.com/apis}{ESPN API} and an \href{https://github.com/swar/nba_api}{NBA.com client API}, and re-run analytics based on these live data.
+
+    \item \textbf{Player-, team- and season-level stats prediction}: Use deep learning (LSTM) and mathematical (\href{https://github.com/LarremoreLab/SpringRank}{SpringRank}) models trained on recent historical data to predict:
+    \begin{itemize}
+        \item Game outcomes
+        \item Player outcomes:
+        \begin{itemize}
+            \item Box scores
+            \item Playing time
+            \item Injury
+        \end{itemize}
+        \item Season stats:
+        \begin{itemize}
+            \item End-of-season team rankings for each conference
+            \item Playoff qualification probabilities for each team
+            \item Expected win-loss records based on current rankings and team schedules
+        \end{itemize}
+    \end{itemize}
+
+    \item \textbf{In-game event prediction}: use Poisson processes to predict:
+    \begin{itemize}
+        \item Real-time win probabilities during live games
+        \item Player scoring rates and game milestone probabilities (e.g., ``Will Player X score 25+ points tonight?'')
+        \item Event likelihoods (3PM, rebounds, blocks, steals, turnovers, fouls)
+        \item Expected scoring in specific time intervals
+        \item Scoring runs (what is the probability that Team A goes on a 10-0 run?)
+        \item Non-homogeneous Poisson processes to model momentum and clutch performance
+    \end{itemize}
+
+    \item \textbf{Dashboard}: Dashboard interface allows users to view current rankings, game event, score, and season projections, and historical trends with minimal latency
+\end{enumerate}
+
+\section{Software and Hardware Components}
+
+\subsection{Cloud Platform: GCP}
+
+\subsection{Data Layer}
+\begin{enumerate}
+    \item \textbf{Cloud SQL (PostgreSQL)} - Relational database for:
+    \begin{itemize}
+        \item Historical game results and statistics (2010-present)
+        \item Team and player information
+        \item Training dataset storage
+        \item User query logs
+    \end{itemize}
+
+    \item \textbf{Google Cloud Storage (GCS)} - Object storage for:
+    \begin{itemize}
+        \item Trained ML model weights and checkpoints
+        \item Large datasets and CSV exports
+        \item Backup and archival data
+    \end{itemize}
+
+    \item \textbf{Memorystore (Redis)} - In-memory cache for:
+    \begin{itemize}
+        \item Current team rankings and standings
+        \item Recent API responses
+        \item Frequently accessed predictions
+        \item Session management
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Compute Layer}
+\begin{enumerate}[resume]
+    \item \textbf{Google Kubernetes Engine (GKE)} - Container orchestration hosting:
+    \begin{itemize}
+        \item Data Ingestion Service (Python FastAPI)
+        \item ML Training/Inference Service (Python, scikit-learn/TensorFlow)
+        \item Poisson Event Modeling Service (Python, scipy)
+        \item API Gateway Service (Node.js/Python)
+        \item Web Frontend Service (React.js served via nginx)
+    \end{itemize}
+
+    \item \textbf{Docker} - Containerization of all microservices
+\end{enumerate}
+
+\subsection{Message Queue Layer}
+\begin{enumerate}[resume]
+    \item \textbf{Cloud Pub/Sub} - Message queue for:
+    \begin{itemize}
+        \item Distributing incoming game results to processing services
+        \item Triggering model retraining jobs
+        \item Coordinating between microservices
+    \end{itemize}
+\end{enumerate}
+
+\subsection{APIs}
+\begin{enumerate}[resume]
+    \item \textbf{REST APIs} - For:
+    \begin{itemize}
+        \item External data ingestion (ESPN, NBA Stats)
+        \item Internal microservice communication
+        \item Frontend-backend communication
+        \item Public API endpoints for client applications
+    \end{itemize}
+\end{enumerate}
+
+\subsection{ML}
+\begin{enumerate}[resume]
+    \item \textbf{Python 3.10+} with libraries:
+    \begin{itemize}
+        \item scikit-learn (baseline models: Random Forest, Logistic Regression)
+        \item TensorFlow/Keras (optional neural network models)
+        \item scipy.stats (Poisson distributions and statistical modeling)
+        \item numpy (numerical computations and Monte Carlo simulations)
+        \item pandas (data processing)
+        \item requests (API calls)
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Frontend}
+\begin{enumerate}[resume]
+    \item \textbf{React.js} - Single-page application for user dashboard
+    \item \textbf{Chart.js/D3.js} - Data visualization libraries
+    \item \textbf{Material-UI} - Component library
+\end{enumerate}
+
+\subsection{Monitoring and Logging}
+\begin{enumerate}[resume]
+    \item \textbf{Cloud Logging} - Centralized logging
+    \item \textbf{Cloud Monitoring} - Performance metrics and alerting
+\end{enumerate}
+
+\subsection{Hardware Resources (GCP)}
+\begin{itemize}
+    \item \textbf{GKE Cluster}: 3-5 n1-standard-2 nodes (2 vCPUs, 7.5GB RAM each)
+    \item \textbf{Cloud SQL Instance}: db-n1-standard-1 (1 vCPU, 3.75GB RAM)
+    \item \textbf{Memorystore Redis}: 1GB Basic Tier instance
+\end{itemize}
+
+\section{Architecture}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{sys_diagram_nba.png}
+\caption{System Architecture Diagram}
+\label{fig:architecture}
+\end{figure}
+
+\section{Microservices and Interactions}
+
+\subsection{Data Flow and Component Interactions}
+
+\subsubsection{Data Ingestion}
+\begin{enumerate}
+    \item \textbf{Data Ingestion service} runs on a scheduled basis (e.g., every 30 minutes during the NBA season)
+    \item It makes REST API calls to external sources (ESPN API, NBA Stats API) to fetch:
+    \begin{itemize}
+        \item Recent game results
+        \item Updated team standings
+        \item Player performance statistics
+    \end{itemize}
+    \item The service validates and transforms the raw data into a standardized format
+    \item Validated data is published to \textbf{Cloud Pub/Sub} topic \texttt{new-game-results}
+    \item The ingestion service also writes raw data to \textbf{Cloud SQL} for historical record-keeping
+\end{enumerate}
+
+\subsubsection{Model Training and Inference}
+\begin{enumerate}
+    \item \textbf{ML Training/Inference service} subscribes to the \texttt{new-game-results} topic
+    \item When new game data arrives:
+    \begin{itemize}
+        \item The service updates its training dataset in \textbf{Cloud SQL}
+        \item If enough new data has accumulated (e.g., 1-4 new games or daily on days when games are played), trigger a retraining job
+    \end{itemize}
+    \item Model training process:
+    \begin{itemize}
+        \item Fetches historical data from \textbf{Cloud SQL} (last 5 seasons)
+        \item Trains ensemble models (Random Forest, Logistic Regression)
+        \item Validates model performance using cross-validation
+        \item Saves model weights and metadata to \textbf{Google Cloud Storage}
+    \end{itemize}
+    \item After training, the service generates fresh predictions for all teams
+    \item Predictions are written to both:
+    \begin{itemize}
+        \item \textbf{Cloud SQL} (persistent storage with timestamps)
+        \item \textbf{Memorystore Redis} (fast cache with 1-hour TTL)
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Poisson Process Modeling}
+\begin{enumerate}
+    \item \textbf{Poisson Event Modeling service} subscribes to both \texttt{new-game-results} and \texttt{live-game-events} topics
+    \item \textbf{Rate parameter estimation}:
+    \begin{itemize}
+        \item Service queries \textbf{Cloud SQL} for play-by-play data
+        \item Calculates scoring rates for teams/players:
+        \begin{itemize}
+            \item Points per minute (overall and situational)
+            \item Three-point attempt rates
+            \item Turnover rates
+            \item Foul rates
+        \end{itemize}
+        \item Adjusts rates based on:
+        \begin{itemize}
+            \item Opponent defensive ratings
+            \item Home/away status
+            \item Rest days
+            \item Recent form (last 5 games)
+        \end{itemize}
+        \item Stores computed rate parameters in \textbf{Redis} with 24-hour TTL
+    \end{itemize}
+    \item \textbf{Live game predictions}:
+    \begin{itemize}
+        \item When a live game event occurs (score update, timeout, etc.):
+        \begin{itemize}
+            \item Service fetches current game state (score, time remaining, possessions)
+            \item Retrieves team $\lambda$ parameters from \textbf{Redis}
+            \item Runs Monte Carlo simulations (10,000 iterations):
+            \begin{itemize}
+                \item Simulates remaining game using dual Poisson processes
+                \item One process for each team
+                \item Accounts for time remaining and possession count
+            \end{itemize}
+            \item Calculates win probability, expected final score, and confidence intervals
+            \item Publishes results to \texttt{prediction-requests} topic
+            \item Caches live probabilities in \textbf{Redis} (1-minute TTL for rapidly changing values)
+        \end{itemize}
+    \end{itemize}
+    \item \textbf{Player event predictions}:
+    \begin{itemize}
+        \item Calculates probabilities for player milestones:
+        \begin{itemize}
+            \item ``Will Player X score 25+ points tonight?''
+            \item ``Probability of 5+ three-pointers made''
+            \item ``Risk of fouling out''
+        \end{itemize}
+        \item Uses player-specific rate parameters adjusted for matchup difficulty
+        \item Results stored in \textbf{Redis} and \textbf{Cloud SQL}
+    \end{itemize}
+    \item \textbf{Model persistence}:
+    \begin{itemize}
+        \item Fitted Poisson rate parameters saved to \textbf{GCS} daily
+        \item Historical accuracy metrics logged to \textbf{Cloud SQL}
+        \item Enables backtesting and model improvement
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{API Requests}
+\begin{enumerate}
+    \item User visits the web application frontend
+    \item \textbf{Frontend (React)} sends HTTPS requests to the \textbf{API Gateway Service}
+    \item API Gateway checks authentication/authorization
+    \item For season-end prediction requests:
+    \begin{itemize}
+        \item Gateway first checks \textbf{Redis cache} for recent predictions
+        \item If cache hit: Returns cached data immediately
+        \item If cache miss: Queries \textbf{Cloud SQL} for latest predictions from ML Training Service
+        \item Query results are cached in Redis for future requests
+    \end{itemize}
+    \item For live game probability requests:
+    \begin{itemize}
+        \item Gateway checks \textbf{Redis} for most recent Poisson-based win probabilities
+        \item If not cached or stale, sends request to \textbf{Poisson Event Modeling Service} via Pub/Sub
+        \item Service computes fresh probability using Monte Carlo simulation and caches result
+        \item Returns win probability, expected score, and confidence intervals
+    \end{itemize}
+    \item For player event predictions:
+    \begin{itemize}
+        \item Gateway queries cached Poisson rate parameters from \textbf{Redis}
+        \item If cache miss, \textbf{Poisson Service} computes rates from play-by-play data in \textbf{Cloud SQL}
+        \item Returns probabilities for requested milestones (e.g., ``25+ points tonight'')
+    \end{itemize}
+    \item For historical data requests:
+    \begin{itemize}
+        \item Gateway queries \textbf{Cloud SQL} directly
+        \item Results may be cached based on query patterns
+    \end{itemize}
+    \item Responses are sent back to the frontend as JSON
+\end{enumerate}
+
+\subsubsection{Real-time Updates}
+\begin{enumerate}
+    \item When critical events occur (playoff scenarios change, major upsets):
+    \begin{itemize}
+        \item Ingestion Service publishes to \texttt{model-retrain-trigger} topic
+        \item ML Service receives trigger and prioritizes immediate retraining
+        \item Once new predictions are ready, a notification is published
+        \item Frontend can poll for updates or use WebSocket connections for live updates
+    \end{itemize}
+    \item During live games:
+    \begin{itemize}
+        \item Ingestion Service publishes to \texttt{live-game-events} topic every 30-60 seconds
+        \item \textbf{Poisson Event Modeling Service} immediately recalculates win probabilities
+        \item Updated probabilities pushed to \textbf{Redis}
+        \item Frontend displays real-time probability charts that update as game progresses
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Containerized Deployment}
+\begin{enumerate}
+    \item All services are packaged as \textbf{Docker containers}
+    \item \textbf{GKE} manages container lifecycle:
+    \begin{itemize}
+        \item Auto-scaling based on CPU/memory usage
+        \item Load balancing across multiple pod replicas
+        \item Health checks and automatic restarts
+        \item Rolling updates for zero-downtime deployments
+    \end{itemize}
+    \item Services communicate within the cluster using Kubernetes service discovery
+\end{enumerate}
+
+\subsubsection{Message Queue Coordination}
+\textbf{Cloud Pub/Sub} decouples services and enables:
+\begin{itemize}
+    \item Asynchronous processing (ingestion doesn't wait for training)
+    \item Fault tolerance (messages are persisted if subscribers are down)
+    \item Scalability (multiple service instances can subscribe to same topic)
+    \item Priority handling (urgent retraining can use separate topic)
+\end{itemize}
+
+\section{Debugging and Testing}
+
+\subsection{Unit Testing}
+\begin{itemize}
+    \item \textbf{Component-level tests} for each microservice
+    \item \textbf{Framework}: pytest for Python services, Jest for React frontend
+    \item \textbf{Coverage targets}: >80\% code coverage
+    \item \textbf{Testing approach}:
+    \begin{itemize}
+        \item Static external API calls using historical games from ESPN API
+        \item Verify ML model input/output shapes
+        \item Test cache hit/miss scenarios
+    \end{itemize}
+\end{itemize}
+
+\subsection{Integration Testing}
+\begin{itemize}
+    \item \textbf{Service-to-service communication tests}
+    \item \textbf{Pub/Sub message flow verification}:
+    \begin{itemize}
+        \item Publish test messages and verify subscribers process them correctly
+        \item Test message acknowledgment and retry logic
+    \end{itemize}
+    \item \textbf{Database interaction tests}:
+    \begin{itemize}
+        \item Test CRUD operations against test PostgreSQL database
+        \item Verify transaction handling and rollback scenarios
+    \end{itemize}
+    \item \textbf{Cache integration tests}:
+    \begin{itemize}
+        \item Verify Redis caching behavior
+        \item Test cache invalidation logic
+    \end{itemize}
+\end{itemize}
+
+\subsection{End-to-End Testing}
+\begin{itemize}
+    \item \textbf{Full pipeline tests}:
+    \begin{itemize}
+        \item Simulate game data ingestion to model training to prediction generation to API response pipeline
+        \item Use staging environment with production-like configuration
+    \end{itemize}
+    \item \textbf{Load testing}:
+    \begin{itemize}
+        \item Apache JMeter or Locust to simulate concurrent users
+        \item Test API Gateway under load (100+ requests/second)
+        \item Verify auto-scaling behavior in GKE
+    \end{itemize}
+\end{itemize}
+
+\subsection{Model Validation and Testing}
+
+\textbf{ML Models:}
+\begin{itemize}
+    \item Training data validation:
+    \begin{itemize}
+        \item Check for data quality issues (missing values, clip outlier statistics)
+        \item Verify temporal consistency (no data leakage)
+    \end{itemize}
+    \item Model performance metrics:
+    \begin{itemize}
+        \item Accuracy, precision, recall for playoff predictions
+        \item Mean Absolute Error (MAE) for win-loss projections
+        \item Backtesting on previous seasons (2022-2024)
+    \end{itemize}
+    \item A/B testing framework:
+    \begin{itemize}
+        \item Train and deploy several model architectures and compare performance on both historical and current season data
+    \end{itemize}
+\end{itemize}
+
+\textbf{Poisson process model development and validation:}
+\begin{itemize}
+    \item \textbf{Rate parameter validation}:
+    \begin{itemize}
+        \item Cross-validation: Train on games 1-70, test on games 71-82 of a season
+        \item Verify rate parameter estimates stabilize after enough games
+        \item Compare estimated rates to actual observed rates using Chi-square goodness-of-fit tests
+    \end{itemize}
+    \item \textbf{Win probability accuracy}:
+    \begin{itemize}
+        \item Calibration plots: Are predicted 70\% win probabilities actually winning 70\% of the time?
+        \item Brier score: Measure accuracy of probabilistic predictions
+        \item Compare to baseline models (Vegas odds, SpringRank)
+        \item Track accuracy across different game situations (close games, blowouts, clutch time)
+    \end{itemize}
+    \item \textbf{Monte Carlo simulation validation}:
+    \begin{itemize}
+        \item Verify convergence: Results stable with 10,000 simulations
+        \item Compare Monte Carlo to analytical solutions for simple cases
+        \item Test computational performance (simulations complete in $\sim$real-time)
+    \end{itemize}
+    \item \textbf{Player event prediction validation}:
+    \begin{itemize}
+        \item Backtest player milestone predictions on historical games
+        \item Calculate ROI if used for betting (theoretical analysis only)
+        \item Verify confidence intervals contain true outcomes at expected rates
+    \end{itemize}
+    \item \textbf{Assumption checks}:
+    \begin{itemize}
+        \item Test for independence: Are consecutive baskets independent? (probably not!)
+        \item Test for constant rate: Do rates change during game? (we expect difference for 1st quarter vs 4th)
+        \item Implement piecewise Poisson models if needed (different $\lambda$ for different game periods)
+    \end{itemize}
+    \item \textbf{Edge cases}:
+    \begin{itemize}
+        \item Extreme scores (50-point leads, overtime games)
+        \item Unusual rates (defensive battles, high-scoring shootouts)
+    \end{itemize}
+\end{itemize}
+
+\subsection{Debugging Tools and Techniques}
+\begin{itemize}
+    \item \textbf{Cloud logging}:
+    \begin{itemize}
+        \item Structured logging with correlation IDs across services
+        \item Log levels: DEBUG for development, INFO for production
+        \item Searchable logs aggregated in Google Cloud Console
+    \end{itemize}
+    \item \textbf{Cloud monitoring}:
+    \begin{itemize}
+        \item Custom metrics for:
+        \begin{itemize}
+            \item API response times
+            \item ML model training duration
+            \item Poisson simulation computation time
+            \item Prediction accuracy over time (both ML and Poisson models)
+            \item Cache hit rates (especially for Poisson rate parameters)
+            \item Live game probability update frequency
+        \end{itemize}
+        \item Alerts for:
+        \begin{itemize}
+            \item Error rate spikes
+            \item API latency > 500ms
+            \item Failed model training jobs
+            \item Poisson simulations taking >200ms
+            \item Win probability calculation errors
+            \item Unusual rate parameter values (potential data quality issues)
+        \end{itemize}
+    \end{itemize}
+    \item \textbf{Distributed tracing}:
+    \begin{itemize}
+        \item Cloud Trace to track request flow across microservices
+        \item Identify bottlenecks in the request pipeline
+    \end{itemize}
+    \item \textbf{Local development}:
+    \begin{itemize}
+        \item Docker Compose for running full stack locally
+        \item Minikube for local Kubernetes testing
+        \item Environment parity (dev/staging/prod)
+    \end{itemize}
+\end{itemize}
+
+\subsection{Data Quality Monitoring}
+\begin{itemize}
+    \item \textbf{Ingestion monitoring}:
+    \begin{itemize}
+        \item Track API availability and response times
+        \item Alert on data schema changes
+        \item Validate data completeness (all expected games ingested)
+    \end{itemize}
+    \item \textbf{Anomaly detection}:
+    \begin{itemize}
+        \item Flag unusual prediction patterns
+        \item Detect model drift (degrading accuracy over time)
+    \end{itemize}
+\end{itemize}
+
+\section{Cloud Technologies Used}
+
+\subsection{Message Queues}
+\begin{itemize}
+    \item \textbf{Technology Used}: Google Cloud Pub/Sub
+    \item \textbf{For}: Asynchronous message passing between Data Ingestion Service, ML Training Service, Poisson Process Service, and API Gateway
+\end{itemize}
+
+\subsection{Databases}
+\begin{itemize}
+    \item \textbf{Technology Used}: Cloud SQL (PostgreSQL)
+    \item \textbf{For}: Persistent storage of historical game data, team statistics, player information, and prediction history
+\end{itemize}
+
+\subsection{Key-Value Stores}
+\begin{itemize}
+    \item \textbf{Technology Used}: Memorystore (Redis)
+    \item \textbf{For}: High-speed caching of current rankings, recent predictions, and API responses
+\end{itemize}
+
+\subsection{Containerization}
+\begin{itemize}
+    \item \textbf{Technology Used}: Docker containers orchestrated by Google Kubernetes Engine (GKE)
+    \item \textbf{For}: Containerization and orchestration of all microservices (ML inference/training, Poisson process modeling, API gateway)
+\end{itemize}
+
+\subsection{Storage Services}
+\begin{itemize}
+    \item \textbf{Technology Used}: Google Cloud Storage (GCS)
+    \item \textbf{For}: Object storage for trained ML model weights, checkpoints, and large datasets
+\end{itemize}
+
+\subsection{RPC / API Interfaces}
+\begin{itemize}
+    \item \textbf{Technology Used}: REST APIs (internal and external)
+    \item \textbf{For}: Communication between frontend and backend, between microservices, and with external data providers
+\end{itemize}
+
+\end{document}
