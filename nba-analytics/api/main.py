@@ -17,6 +17,7 @@ from models.database_models import Team, Player, Game, PlayerGameStats, TeamStan
 from models.database import db_manager
 from services.cache import cache_manager
 from services.data_ingestion import ingestion_service
+from services.live_game_service import live_game_service
 
 # Configure logging
 logging.basicConfig(
@@ -114,6 +115,93 @@ class HealthResponse(BaseModel):
     database: bool
     cache: bool
     timestamp: str
+
+
+# Live game response models
+class LiveGameInfo(BaseModel):
+    game_id: str
+    home_team_id: int
+    away_team_id: int
+    home_team_abbr: str
+    away_team_abbr: str
+    home_team_name: str
+    away_team_name: str
+    home_score: int
+    away_score: int
+    status: str
+    status_id: int
+    is_live: bool
+    period: int
+    game_clock: str
+    start_time: str
+
+
+class PlayEvent(BaseModel):
+    event_id: int
+    period: int
+    clock: str
+    event_type: str
+    description: str
+    player_name: Optional[str]
+    team_abbr: Optional[str]
+    home_score: int
+    away_score: int
+    shot_made: Optional[bool]
+
+
+class ShotLocation(BaseModel):
+    x: float
+    y: float
+    player_id: int
+    player_name: str
+    team_id: int
+    team_abbr: str
+    shot_type: str
+    made: bool
+    distance: int
+    zone: str
+    action_type: str
+    period: int
+    clock: Optional[str] = None  # Live API uses clock string instead of min/sec
+    minutes_remaining: Optional[int] = None
+    seconds_remaining: Optional[int] = None
+
+
+class BoxScorePlayer(BaseModel):
+    player_id: int
+    player_name: str
+    team_id: int
+    team_abbr: str
+    minutes: str
+    points: int
+    rebounds: int
+    assists: int
+    steals: int
+    blocks: int
+    turnovers: int
+    fg_made: int
+    fg_attempted: int
+    fg_pct: float
+    three_made: int
+    three_attempted: int
+    plus_minus: int
+
+
+class BoxScoreTeam(BaseModel):
+    team_id: int
+    team_abbr: str
+    points: int
+    rebounds: int
+    assists: int
+    fg_pct: float
+    three_pct: float
+
+
+class LiveGameDataResponse(BaseModel):
+    game_info: Optional[LiveGameInfo]
+    plays: List[PlayEvent]
+    shots: List[ShotLocation]
+    box_score: Dict[str, Any]
 
 
 # Create FastAPI app
@@ -379,6 +467,58 @@ def get_recent_games(
         ))
     
     return result
+
+
+# Live game endpoints
+@app.get("/api/games/live", response_model=List[LiveGameInfo], tags=["Live Games"])
+def get_live_games():
+    """Get all games currently in progress or scheduled for today."""
+    games = live_game_service.get_live_games()
+    return [LiveGameInfo(**g) for g in games]
+
+
+@app.get("/api/games/live/active", response_model=List[LiveGameInfo], tags=["Live Games"])
+def get_active_live_games():
+    """Get only games that are currently in progress."""
+    games = live_game_service.get_live_games()
+    return [LiveGameInfo(**g) for g in games if g.get('is_live')]
+
+
+@app.get("/api/games/live/upcoming", response_model=List[LiveGameInfo], tags=["Live Games"])
+def get_upcoming_games():
+    """Get games scheduled for today that haven't started yet."""
+    games = live_game_service.get_upcoming_games()
+    return [LiveGameInfo(**g) for g in games]
+
+
+@app.get("/api/games/{game_id}/live", response_model=LiveGameDataResponse, tags=["Live Games"])
+def get_live_game_data(game_id: str):
+    """Get comprehensive live data for a specific game (plays, shots, box score)."""
+    data = live_game_service.get_live_game_data(game_id)
+
+    return LiveGameDataResponse(
+        game_info=LiveGameInfo(**data['game_info']) if data.get('game_info') else None,
+        plays=[PlayEvent(**p) for p in data.get('plays', [])],
+        shots=[ShotLocation(**s) for s in data.get('shots', [])],
+        box_score=data.get('box_score', {})
+    )
+
+
+@app.get("/api/games/{game_id}/plays", response_model=List[PlayEvent], tags=["Live Games"])
+def get_game_plays(
+    game_id: str,
+    last_event_id: int = Query(0, description="Only return events after this ID")
+):
+    """Get play-by-play events for a game (supports incremental fetching)."""
+    plays = live_game_service.get_play_by_play(game_id, last_event_id)
+    return [PlayEvent(**p) for p in plays]
+
+
+@app.get("/api/games/{game_id}/shots", response_model=List[ShotLocation], tags=["Live Games"])
+def get_game_shots(game_id: str):
+    """Get shot chart data for a game with court coordinates."""
+    shots = live_game_service.get_shot_chart(game_id)
+    return [ShotLocation(**s) for s in shots]
 
 
 # Statistics endpoints

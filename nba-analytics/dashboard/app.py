@@ -150,6 +150,770 @@ def check_api_health():
     return health and health.get("status") in ["healthy", "degraded"]
 
 
+# Live game API functions
+@st.cache_data(ttl=15)  # Cache for 15 seconds for live data
+def get_live_games():
+    """Get all live/today's games."""
+    return api_get("/api/games/live")
+
+
+@st.cache_data(ttl=15)
+def get_live_game_data(game_id: str):
+    """Get live data for a specific game."""
+    return api_get(f"/api/games/{game_id}/live")
+
+
+@st.cache_data(ttl=15)
+def get_game_shots(game_id: str):
+    """Get shot chart data for a game."""
+    return api_get(f"/api/games/{game_id}/shots")
+
+
+@st.cache_data(ttl=15)
+def get_game_plays(game_id: str):
+    """Get play-by-play data for a game."""
+    return api_get(f"/api/games/{game_id}/plays")
+
+
+def draw_nba_court(shots: list = None) -> go.Figure:
+    """
+    Draw an NBA half-court with shot locations using Plotly.
+    Court dimensions are in 10ths of feet (NBA standard).
+    """
+    fig = go.Figure()
+
+    # Court dimensions (in 10ths of feet)
+    # Origin (0,0) is at the basket
+
+    # Court outline (half court)
+    court_shapes = [
+        # Outer boundary
+        dict(type="rect", x0=-250, y0=-50, x1=250, y1=420, line=dict(color="black", width=2), fillcolor="rgba(245, 222, 179, 0.3)"),
+
+        # Paint/Key (16 ft wide, 19 ft deep = 160 x 190)
+        dict(type="rect", x0=-80, y0=-50, x1=80, y1=140, line=dict(color="black", width=2), fillcolor="rgba(0,0,0,0)"),
+
+        # Free throw circle (6 ft radius = 60)
+        dict(type="circle", x0=-60, y0=80, x1=60, y1=200, line=dict(color="black", width=2), fillcolor="rgba(0,0,0,0)"),
+
+        # Backboard (6 ft wide = 60)
+        dict(type="line", x0=-30, y0=-7.5, x1=30, y1=-7.5, line=dict(color="black", width=3)),
+
+        # Basket/Rim (9 inch radius = 7.5)
+        dict(type="circle", x0=-7.5, y0=-7.5, x1=7.5, y1=7.5, line=dict(color="orange", width=3), fillcolor="rgba(0,0,0,0)"),
+
+        # Restricted area (4 ft radius = 40)
+        dict(type="path",
+             path="M -40 0 A 40 40 0 0 1 40 0",
+             line=dict(color="black", width=2)),
+
+        # Three-point line corners (22 ft = 220)
+        dict(type="line", x0=-220, y0=-50, x1=-220, y1=90, line=dict(color="black", width=2)),
+        dict(type="line", x0=220, y0=-50, x1=220, y1=90, line=dict(color="black", width=2)),
+    ]
+
+    # Three-point arc (23.75 ft = 237.5 from basket)
+    import numpy as np
+    theta = np.linspace(np.arccos(220/237.5), np.pi - np.arccos(220/237.5), 100)
+    arc_x = 237.5 * np.cos(theta)
+    arc_y = 237.5 * np.sin(theta)
+
+    fig.add_trace(go.Scatter(
+        x=arc_x, y=arc_y,
+        mode='lines',
+        line=dict(color='black', width=2),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Add court shapes
+    fig.update_layout(shapes=court_shapes)
+
+    # Plot shots if provided
+    if shots:
+        made_shots = [s for s in shots if s.get('made')]
+        missed_shots = [s for s in shots if not s.get('made')]
+
+        # Made shots (green filled circles)
+        if made_shots:
+            fig.add_trace(go.Scatter(
+                x=[s['x'] for s in made_shots],
+                y=[s['y'] for s in made_shots],
+                mode='markers',
+                marker=dict(
+                    size=12,
+                    color='green',
+                    symbol='circle',
+                    line=dict(width=2, color='darkgreen')
+                ),
+                name='Made',
+                text=[f"{s.get('player_name', 'Unknown')} - {s.get('shot_type', '')} ({s.get('distance', 0)}ft)" for s in made_shots],
+                hovertemplate='%{text}<extra></extra>'
+            ))
+
+        # Missed shots (red hollow circles)
+        if missed_shots:
+            fig.add_trace(go.Scatter(
+                x=[s['x'] for s in missed_shots],
+                y=[s['y'] for s in missed_shots],
+                mode='markers',
+                marker=dict(
+                    size=12,
+                    color='white',
+                    symbol='circle',
+                    line=dict(width=2, color='red')
+                ),
+                name='Missed',
+                text=[f"{s.get('player_name', 'Unknown')} - {s.get('shot_type', '')} ({s.get('distance', 0)}ft)" for s in missed_shots],
+                hovertemplate='%{text}<extra></extra>'
+            ))
+
+    # Update layout
+    fig.update_layout(
+        xaxis=dict(
+            range=[-275, 275],
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            fixedrange=True
+        ),
+        yaxis=dict(
+            range=[-75, 450],
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            scaleanchor="x",
+            scaleratio=1,
+            fixedrange=True
+        ),
+        height=500,
+        margin=dict(l=20, r=20, t=30, b=20),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+    )
+
+    return fig
+
+
+def draw_3d_shot_chart(shots: list = None) -> go.Figure:
+    """
+    Draw a stunning 3D NBA half-court with shot arcs using Plotly.
+    Features:
+    - 3D court surface with NBA markings
+    - Green parabolic arcs for made shots from shot location to basket
+    - Player headshots and names on hover
+    - Full width, no legend
+    """
+    import numpy as np
+
+    fig = go.Figure()
+
+    # Court dimensions (in 10ths of feet)
+    # Scale factor to normalize the 3D view
+    scale = 1.0
+
+    # Draw the court floor as a surface
+    court_x = np.array([-250, 250, 250, -250, -250]) * scale
+    court_y = np.array([-50, -50, 420, 420, -50]) * scale
+    court_z = np.zeros(5)
+
+    # Court floor outline
+    fig.add_trace(go.Scatter3d(
+        x=court_x, y=court_y, z=court_z,
+        mode='lines',
+        line=dict(color='#1a365d', width=4),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Paint/Key outline
+    paint_x = np.array([-80, 80, 80, -80, -80]) * scale
+    paint_y = np.array([-50, -50, 140, 140, -50]) * scale
+    paint_z = np.zeros(5)
+
+    fig.add_trace(go.Scatter3d(
+        x=paint_x, y=paint_y, z=paint_z,
+        mode='lines',
+        line=dict(color='#c53030', width=3),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Free throw circle
+    theta_ft = np.linspace(0, 2*np.pi, 50)
+    ft_x = 60 * np.cos(theta_ft) * scale
+    ft_y = (140 + 60 * np.sin(theta_ft)) * scale
+    ft_z = np.zeros_like(theta_ft)
+
+    fig.add_trace(go.Scatter3d(
+        x=ft_x, y=ft_y, z=ft_z,
+        mode='lines',
+        line=dict(color='#c53030', width=2),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Three-point arc
+    theta_3pt = np.linspace(np.arccos(220/237.5), np.pi - np.arccos(220/237.5), 100)
+    arc3_x = 237.5 * np.cos(theta_3pt) * scale
+    arc3_y = 237.5 * np.sin(theta_3pt) * scale
+    arc3_z = np.zeros_like(theta_3pt)
+
+    fig.add_trace(go.Scatter3d(
+        x=arc3_x, y=arc3_y, z=arc3_z,
+        mode='lines',
+        line=dict(color='#1a365d', width=3),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Three-point corner lines
+    fig.add_trace(go.Scatter3d(
+        x=[-220*scale, -220*scale], y=[-50*scale, 90*scale], z=[0, 0],
+        mode='lines',
+        line=dict(color='#1a365d', width=3),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=[220*scale, 220*scale], y=[-50*scale, 90*scale], z=[0, 0],
+        mode='lines',
+        line=dict(color='#1a365d', width=3),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Basket/Rim (at z=10 for height)
+    rim_theta = np.linspace(0, 2*np.pi, 30)
+    rim_x = 7.5 * np.cos(rim_theta) * scale
+    rim_y = 7.5 * np.sin(rim_theta) * scale
+    rim_z = np.ones_like(rim_theta) * 100  # Rim height (10 feet = 100 tenths)
+
+    fig.add_trace(go.Scatter3d(
+        x=rim_x, y=rim_y, z=rim_z,
+        mode='lines',
+        line=dict(color='#dd6b20', width=6),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Backboard
+    fig.add_trace(go.Scatter3d(
+        x=[-30*scale, 30*scale], y=[-7.5*scale, -7.5*scale], z=[80, 80],
+        mode='lines',
+        line=dict(color='white', width=8),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=[-30*scale, 30*scale], y=[-7.5*scale, -7.5*scale], z=[130, 130],
+        mode='lines',
+        line=dict(color='white', width=8),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=[-30*scale, -30*scale], y=[-7.5*scale, -7.5*scale], z=[80, 130],
+        mode='lines',
+        line=dict(color='white', width=8),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=[30*scale, 30*scale], y=[-7.5*scale, -7.5*scale], z=[80, 130],
+        mode='lines',
+        line=dict(color='white', width=8),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Plot shots if provided
+    if shots:
+        made_shots = [s for s in shots if s.get('made')]
+        missed_shots = [s for s in shots if not s.get('made')]
+
+        # Function to create parabolic arc from shot location to basket
+        def create_shot_arc(shot_x, shot_y, distance):
+            """Create a parabolic trajectory from shot location to basket."""
+            t = np.linspace(0, 1, 30)
+
+            # Start point (shot location)
+            x0, y0 = shot_x * scale, shot_y * scale
+            z0 = 80  # Release height (~8 feet)
+
+            # End point (basket)
+            x1, y1 = 0, 0
+            z1 = 100  # Rim height
+
+            # Arc height based on distance (higher arc for longer shots)
+            arc_height = max(150, 100 + distance * 3)
+
+            # Parametric parabola
+            arc_x = x0 + (x1 - x0) * t
+            arc_y = y0 + (y1 - y0) * t
+            # Parabolic z with peak in the middle
+            arc_z = z0 + (z1 - z0) * t + 4 * (arc_height - max(z0, z1)) * t * (1 - t)
+
+            return arc_x, arc_y, arc_z
+
+        # Draw arcs for made shots (green)
+        for shot in made_shots:
+            arc_x, arc_y, arc_z = create_shot_arc(
+                shot['x'], shot['y'], shot.get('distance', 15)
+            )
+            fig.add_trace(go.Scatter3d(
+                x=arc_x, y=arc_y, z=arc_z,
+                mode='lines',
+                line=dict(color='#38a169', width=4),
+                showlegend=False,
+                hoverinfo='skip',
+                opacity=0.7
+            ))
+
+        # Made shots as points at shot location with player info on hover
+        if made_shots:
+            # Create hover text (clean, without HTML images - those don't render in Plotly 3D)
+            hover_texts = []
+            custom_data = []
+            for s in made_shots:
+                player_name = s.get('player_name', 'Unknown')
+                player_id = s.get('player_id', 0)
+                shot_type = s.get('shot_type', '')
+                distance = s.get('distance', 0)
+                team = s.get('team_abbr', '')
+
+                hover_texts.append(
+                    f"<b style='font-size:14px'>{player_name}</b><br>"
+                    f"<span style='color:#48bb78'>MADE</span><br>"
+                    f"{team} | {shot_type} | {distance}ft"
+                )
+                custom_data.append([player_id, player_name, team])
+
+            fig.add_trace(go.Scatter3d(
+                x=[s['x'] * scale for s in made_shots],
+                y=[s['y'] * scale for s in made_shots],
+                z=[80 for _ in made_shots],  # Release height
+                mode='markers',
+                marker=dict(
+                    size=10,
+                    color='#38a169',
+                    symbol='circle',
+                    line=dict(width=2, color='#276749'),
+                    opacity=0.9
+                ),
+                text=hover_texts,
+                customdata=custom_data,
+                hovertemplate='%{text}<extra></extra>',
+                showlegend=False
+            ))
+
+        # Missed shots as X markers (no arcs)
+        if missed_shots:
+            hover_texts_missed = []
+            custom_data_missed = []
+            for s in missed_shots:
+                player_name = s.get('player_name', 'Unknown')
+                player_id = s.get('player_id', 0)
+                shot_type = s.get('shot_type', '')
+                distance = s.get('distance', 0)
+                team = s.get('team_abbr', '')
+
+                hover_texts_missed.append(
+                    f"<b style='font-size:14px'>{player_name}</b><br>"
+                    f"<span style='color:#e53e3e'>MISSED</span><br>"
+                    f"{team} | {shot_type} | {distance}ft"
+                )
+                custom_data_missed.append([player_id, player_name, team])
+
+            fig.add_trace(go.Scatter3d(
+                x=[s['x'] * scale for s in missed_shots],
+                y=[s['y'] * scale for s in missed_shots],
+                z=[80 for _ in missed_shots],
+                mode='markers',
+                marker=dict(
+                    size=8,
+                    color='#e53e3e',
+                    symbol='x',
+                    line=dict(width=2, color='#c53030'),
+                    opacity=0.7
+                ),
+                text=hover_texts_missed,
+                customdata=custom_data_missed,
+                hovertemplate='%{text}<extra></extra>',
+                showlegend=False
+            ))
+
+    # Update layout for 3D view
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(
+                range=[-300, 300],
+                showgrid=False,
+                showbackground=True,
+                backgroundcolor='#e8dcc4',  # Court wood color
+                showticklabels=False,
+                title='',
+                showspikes=False,
+            ),
+            yaxis=dict(
+                range=[-100, 450],
+                showgrid=False,
+                showbackground=True,
+                backgroundcolor='#e8dcc4',
+                showticklabels=False,
+                title='',
+                showspikes=False,
+            ),
+            zaxis=dict(
+                range=[0, 250],
+                showgrid=False,
+                showbackground=False,
+                showticklabels=False,
+                title='',
+                showspikes=False,
+            ),
+            camera=dict(
+                eye=dict(x=0, y=-1.8, z=0.8),
+                center=dict(x=0, y=0.1, z=-0.1),
+                up=dict(x=0, y=0, z=1)
+            ),
+            aspectmode='manual',
+            aspectratio=dict(x=1.2, y=1, z=0.5),
+        ),
+        height=700,
+        margin=dict(l=0, r=0, t=0, b=0),
+        showlegend=False,
+        paper_bgcolor='rgba(20, 20, 30, 1)',
+    )
+
+    return fig
+
+
+def render_play_feed(plays: list, limit: int = 20):
+    """Render the play-by-play feed with icons."""
+    if not plays:
+        st.info("No plays to display yet.")
+        return
+
+    # Event type icons
+    icons = {
+        'SHOT_MADE': '🏀',
+        'SHOT_MISSED': '❌',
+        'FREE_THROW': '🎱',
+        'REBOUND': '🔄',
+        'TURNOVER': '💨',
+        'FOUL': '📍',
+        'VIOLATION': '🚫',
+        'SUBSTITUTION': '🔀',
+        'TIMEOUT': '⏸️',
+        'JUMP_BALL': '⬆️',
+        'PERIOD_BEGIN': '▶️',
+        'PERIOD_END': '⏹️',
+        'OTHER': '📋',
+    }
+
+    # Reverse to show most recent first
+    recent_plays = list(reversed(plays[-limit:]))
+
+    st.markdown("### Play-by-Play")
+    for play in recent_plays:
+        event_type = play.get('event_type', 'OTHER')
+        icon = icons.get(event_type, '📋')
+        period = play.get('period', 0)
+        clock = play.get('clock', '')
+        description = play.get('description', '')
+        team = play.get('team_abbr', '')
+        score = f"{play.get('away_score', 0)} - {play.get('home_score', 0)}"
+
+        # Color based on event type
+        if event_type in ['SHOT_MADE', 'FREE_THROW']:
+            color = '#38a169'
+        elif event_type == 'SHOT_MISSED':
+            color = '#e53e3e'
+        else:
+            color = '#4a5568'
+
+        st.markdown(
+            f"""<div style="padding: 8px; margin: 4px 0; border-left: 3px solid {color}; background: #f7fafc; border-radius: 4px; color: #1a202c;">
+                <span style="font-size: 1.2em;">{icon}</span>
+                <strong style="color: #2d3748;">Q{period} {clock}</strong> <span style="color: #4a5568;">[{team}]</span> <span style="color: #1a202c;">{description}</span>
+                <span style="float: right; color: #718096;">{score}</span>
+            </div>""",
+            unsafe_allow_html=True
+        )
+
+
+def render_shot_heatmap(shots: list) -> go.Figure:
+    """Render a shot heat map on the court."""
+    if not shots:
+        return draw_nba_court([])
+
+    fig = draw_nba_court([])
+
+    # Add density contour for shots
+    x_coords = [s['x'] for s in shots]
+    y_coords = [s['y'] for s in shots]
+
+    fig.add_trace(go.Histogram2dContour(
+        x=x_coords,
+        y=y_coords,
+        colorscale='Hot',
+        reversescale=True,
+        showscale=False,
+        contours=dict(
+            showlabels=False,
+            coloring='heatmap'
+        ),
+        opacity=0.6,
+        name='Shot Density'
+    ))
+
+    return fig
+
+
+def render_live_game():
+    """Render the live game visualization page."""
+    st.markdown('<h2 class="sub-header">Live Game</h2>', unsafe_allow_html=True)
+
+    # Fetch live games
+    live_games = get_live_games()
+
+    if not live_games:
+        st.info("No games currently in progress or scheduled for today.")
+        st.markdown("### Check back later for live game updates!")
+        return
+
+    # Filter to only live games or show all scheduled
+    active_games = [g for g in live_games if g.get('is_live')]
+
+    if active_games:
+        st.success(f"🔴 {len(active_games)} game(s) currently LIVE!")
+        games_to_show = active_games
+    else:
+        st.info("No games currently in progress. Showing today's scheduled games.")
+        games_to_show = live_games
+
+    # Game selector
+    game_options = {
+        f"{g['away_team_abbr']} @ {g['home_team_abbr']} - {g['status']}": g['game_id']
+        for g in games_to_show
+    }
+
+    if not game_options:
+        st.warning("No games available.")
+        return
+
+    selected_label = st.selectbox("Select Game", options=list(game_options.keys()))
+    selected_game_id = game_options[selected_label]
+
+    # Find selected game info
+    selected_game = next((g for g in games_to_show if g['game_id'] == selected_game_id), None)
+
+    if selected_game:
+        # Game header
+        col1, col2, col3 = st.columns([2, 1, 2])
+        with col1:
+            st.markdown(f"### {selected_game['away_team_name']}")
+            st.markdown(f"## {selected_game['away_score']}")
+        with col2:
+            st.markdown("### VS")
+            if selected_game.get('is_live'):
+                st.markdown(f"**Q{selected_game.get('period', 0)}** {selected_game.get('game_clock', '')}")
+            else:
+                st.markdown(f"**{selected_game['status']}**")
+        with col3:
+            st.markdown(f"### {selected_game['home_team_name']}")
+            st.markdown(f"## {selected_game['home_score']}")
+
+    st.markdown("---")
+
+    # Auto-refresh option
+    auto_refresh = st.checkbox("Auto-refresh (15s)", value=selected_game.get('is_live', False) if selected_game else False)
+    if auto_refresh:
+        # Using streamlit-autorefresh would be ideal, but we can use st.rerun with a placeholder
+        st.caption("Auto-refreshing every 15 seconds...")
+
+    # Get shot data for this game
+    shots = get_game_shots(selected_game_id)
+    plays = get_game_plays(selected_game_id)
+
+    # Extract team info from shots for filtering
+    if shots and selected_game:
+        away_team = selected_game.get('away_team_abbr', 'AWAY')
+        home_team = selected_game.get('home_team_abbr', 'HOME')
+        away_team_id = selected_game.get('away_team_id', 0)
+        home_team_id = selected_game.get('home_team_id', 0)
+
+        # Get unique players from shots
+        players_in_game = {}
+        for s in shots:
+            pid = s.get('player_id', 0)
+            pname = s.get('player_name', 'Unknown')
+            pteam = s.get('team_abbr', '')
+            if pid and pname not in players_in_game:
+                players_in_game[pname] = {'id': pid, 'team': pteam}
+    else:
+        away_team = 'AWAY'
+        home_team = 'HOME'
+        away_team_id = 0
+        home_team_id = 0
+        players_in_game = {}
+
+    # Create tabs for different views
+    tab1, tab2, tab3, tab4 = st.tabs(["Shot Chart", "Play-by-Play", "Heat Map", "Box Score"])
+
+    with tab1:
+        st.markdown("### 3D Shot Chart")
+
+        if shots:
+            # Team and Player filtering controls
+            filter_col1, filter_col2, filter_col3 = st.columns([1, 2, 1])
+
+            with filter_col1:
+                # Away team logo and filter button
+                st.image(
+                    f"https://cdn.nba.com/logos/nba/{away_team_id}/global/L/logo.svg",
+                    width=80
+                )
+                away_filter = st.checkbox(f"{away_team}", value=True, key="away_filter")
+
+            with filter_col2:
+                # Player filter dropdown
+                player_options = ["All Players"] + sorted(players_in_game.keys())
+                selected_player = st.selectbox(
+                    "Filter by Player",
+                    options=player_options,
+                    key="player_filter"
+                )
+
+            with filter_col3:
+                # Home team logo and filter button
+                st.image(
+                    f"https://cdn.nba.com/logos/nba/{home_team_id}/global/L/logo.svg",
+                    width=80
+                )
+                home_filter = st.checkbox(f"{home_team}", value=True, key="home_filter")
+
+            # Filter shots based on selections
+            filtered_shots = shots.copy()
+
+            # Team filter
+            if not away_filter:
+                filtered_shots = [s for s in filtered_shots if s.get('team_abbr') != away_team]
+            if not home_filter:
+                filtered_shots = [s for s in filtered_shots if s.get('team_abbr') != home_team]
+
+            # Player filter
+            if selected_player != "All Players":
+                filtered_shots = [s for s in filtered_shots if s.get('player_name') == selected_player]
+
+            # Display player headshot panel if a player is selected
+            if selected_player != "All Players" and selected_player in players_in_game:
+                player_info = players_in_game[selected_player]
+                headshot_col1, headshot_col2 = st.columns([1, 3])
+                with headshot_col1:
+                    st.image(
+                        f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_info['id']}.png",
+                        width=130
+                    )
+                with headshot_col2:
+                    player_shots = [s for s in shots if s.get('player_name') == selected_player]
+                    made = len([s for s in player_shots if s.get('made')])
+                    missed = len([s for s in player_shots if not s.get('made')])
+                    fg_pct = (made / len(player_shots) * 100) if player_shots else 0
+
+                    st.markdown(f"### {selected_player}")
+                    st.markdown(f"**Team:** {player_info['team']}")
+                    st.markdown(f"**FG:** {made}/{len(player_shots)} ({fg_pct:.1f}%)")
+
+            st.caption("Rotate and zoom the 3D court. Green arcs show made shots.")
+
+            # Display the 3D chart
+            st.plotly_chart(draw_3d_shot_chart(filtered_shots), use_container_width=True)
+
+            # Stats summary
+            made_count = len([s for s in filtered_shots if s.get('made')])
+            missed_count = len([s for s in filtered_shots if not s.get('made')])
+            st.markdown(f"**{len(filtered_shots)} shots shown** | 🟢 Made: {made_count} | ❌ Missed: {missed_count}")
+        else:
+            st.info("No shot data available for this game yet.")
+            st.plotly_chart(draw_3d_shot_chart([]), use_container_width=True)
+
+    with tab2:
+        render_play_feed(plays or [])
+
+    with tab3:
+        st.markdown("### Shot Heat Map")
+        if shots:
+            # Team filter for heatmap
+            hm_col1, hm_col2, hm_col3 = st.columns([1, 2, 1])
+            with hm_col1:
+                st.image(
+                    f"https://cdn.nba.com/logos/nba/{away_team_id}/global/L/logo.svg",
+                    width=60
+                )
+                hm_away = st.checkbox(f"{away_team}", value=True, key="hm_away")
+            with hm_col2:
+                st.markdown("#### Filter by Team")
+            with hm_col3:
+                st.image(
+                    f"https://cdn.nba.com/logos/nba/{home_team_id}/global/L/logo.svg",
+                    width=60
+                )
+                hm_home = st.checkbox(f"{home_team}", value=True, key="hm_home")
+
+            # Filter shots for heatmap
+            hm_shots = shots.copy()
+            if not hm_away:
+                hm_shots = [s for s in hm_shots if s.get('team_abbr') != away_team]
+            if not hm_home:
+                hm_shots = [s for s in hm_shots if s.get('team_abbr') != home_team]
+
+            # Larger heatmap
+            heatmap_fig = render_shot_heatmap(hm_shots)
+            heatmap_fig.update_layout(height=600)
+            st.plotly_chart(heatmap_fig, use_container_width=True)
+            st.caption(f"Showing {len(hm_shots)} shots | Hot zones indicate high shot frequency")
+        else:
+            st.info("No shot data available for heat map.")
+
+    with tab4:
+        st.markdown("### Box Score")
+        game_data = get_live_game_data(selected_game_id)
+        if game_data and game_data.get('box_score'):
+            box_score = game_data['box_score']
+            player_stats = box_score.get('player_stats', [])
+
+            if player_stats:
+                # Split by team
+                teams = set(p['team_abbr'] for p in player_stats)
+
+                for team in sorted(teams):
+                    st.markdown(f"#### {team}")
+                    team_players = [p for p in player_stats if p['team_abbr'] == team]
+
+                    df = pd.DataFrame([{
+                        'Player': p['player_name'],
+                        'MIN': p.get('minutes', '0'),
+                        'PTS': p.get('points', 0),
+                        'REB': p.get('rebounds', 0),
+                        'AST': p.get('assists', 0),
+                        'STL': p.get('steals', 0),
+                        'BLK': p.get('blocks', 0),
+                        'FG': f"{p.get('fg_made', 0)}/{p.get('fg_attempted', 0)}",
+                        '3P': f"{p.get('three_made', 0)}/{p.get('three_attempted', 0)}",
+                        '+/-': p.get('plus_minus', 0)
+                    } for p in team_players])
+
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+            else:
+                st.info("Box score not available yet.")
+        else:
+            st.info("Box score data not available.")
+
+
 # Dashboard components
 def render_header():
     """Render the main header."""
@@ -171,7 +935,7 @@ def render_sidebar():
         
         page = st.radio(
             "Select Page",
-            ["📊 Standings", "🎮 Today's Games", "🏆 Leaders", "📈 Team Analysis", "🔮 Predictions"],
+            ["📊 Standings", "🎮 Today's Games", "🏆 Leaders", "📈 Team Analysis", "🔮 Predictions", "🏀 Live Game"],
             label_visibility="collapsed"
         )
         
@@ -337,40 +1101,42 @@ def render_todays_games():
         st.cache_data.clear()
         st.rerun()
     
-    # Display games
-    cols = st.columns(min(3, len(games)))
-    
-    for idx, game in enumerate(games):
-        with cols[idx % 3]:
-            status = game['status']
+    # Display games in a 3-column grid
+    for row_start in range(0, len(games), 3):
+        cols = st.columns(3)
+        for i, col in enumerate(cols):
+            game_idx = row_start + i
+            if game_idx >= len(games):
+                break
+
+            game = games[game_idx]
+            status = game.get('status', 'unknown')
             status_emoji = "🔴" if status == "live" else ("✅" if status == "final" else "⏰")
-            
-            home = game['home_team']
-            away = game['away_team']
-            
-            # Create game card
-            st.markdown(f"""
-            <div class="game-card">
-                <div style="text-align: center; margin-bottom: 0.5rem;">
-                    {status_emoji} <strong>{status.upper()}</strong>
-                    {f" - Q{game.get('period', '')} {game.get('clock', '')}" if status == 'live' else ''}
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="text-align: center; flex: 1;">
-                        <div style="font-size: 1.2rem; font-weight: bold;">{away['abbr']}</div>
-                        <div style="font-size: 1.8rem; font-weight: bold;">{away['score']}</div>
-                    </div>
-                    <div style="text-align: center; padding: 0 1rem;">
-                        <div style="font-size: 1.2rem; color: #718096;">@</div>
-                    </div>
-                    <div style="text-align: center; flex: 1;">
-                        <div style="font-size: 1.2rem; font-weight: bold;">{home['abbr']}</div>
-                        <div style="font-size: 1.8rem; font-weight: bold;">{home['score']}</div>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            st.write("")  # Spacing
+
+            home = game.get('home_team', {})
+            away = game.get('away_team', {})
+
+            with col:
+                # Use a container for the card styling
+                with st.container():
+                    # Status header
+                    status_text = f"{status_emoji} **{status.upper()}**"
+                    if status == 'live':
+                        status_text += f" - Q{game.get('period', '')} {game.get('clock', '')}"
+                    st.markdown(status_text)
+
+                    # Game matchup using columns
+                    c1, c2, c3 = st.columns([2, 1, 2])
+                    with c1:
+                        st.markdown(f"**{away.get('abbr', 'TBD')}**")
+                        st.markdown(f"### {away.get('score', '-')}")
+                    with c2:
+                        st.markdown("@")
+                    with c3:
+                        st.markdown(f"**{home.get('abbr', 'TBD')}**")
+                        st.markdown(f"### {home.get('score', '-')}")
+
+                    st.divider()
 
 
 def render_leaders():
@@ -817,6 +1583,8 @@ def main():
         render_team_analysis()
     elif page == "🔮 Predictions":
         render_predictions()
+    elif page == "🏀 Live Game":
+        render_live_game()
 
 
 if __name__ == "__main__":
