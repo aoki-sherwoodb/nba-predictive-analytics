@@ -153,11 +153,12 @@ module "cloud_run" {
   environment                 = var.environment
   vpc_connector_id            = module.networking.vpc_connector_id
   service_account_email       = google_service_account.cloud_run.email
-  cloud_sql_connection_name   = module.database.connection_name
+  db_connection_name          = module.database.connection_name
   db_name                     = var.db_name
   db_user                     = var.db_user
   db_password_secret_id       = module.database.password_secret_id
   redis_host                  = module.cache.redis_host
+  redis_port                  = module.cache.redis_port
   model_bucket_name           = module.storage.bucket_name
   artifact_registry_url       = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.nba_analytics.repository_id}"
 
@@ -167,11 +168,11 @@ module "cloud_run" {
   api_min_instances  = var.api_min_instances
   api_max_instances  = var.api_max_instances
 
-  # Frontend configuration
-  frontend_cpu            = var.frontend_cpu
-  frontend_memory         = var.frontend_memory
-  frontend_min_instances  = var.frontend_min_instances
-  frontend_max_instances  = var.frontend_max_instances
+  # Dashboard configuration
+  dashboard_cpu            = var.frontend_cpu
+  dashboard_memory         = var.frontend_memory
+  dashboard_min_instances  = var.frontend_min_instances
+  dashboard_max_instances  = var.frontend_max_instances
 
   labels = var.labels
 
@@ -194,7 +195,7 @@ module "scheduler" {
   project_id            = var.project_id
   region                = var.region
   environment           = var.environment
-  api_url               = module.cloud_run.api_url
+  ingestion_job_name    = module.cloud_run.ingestion_job_name
   service_account_email = google_service_account.cloud_run.email
 
   depends_on = [
