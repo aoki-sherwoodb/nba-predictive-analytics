@@ -25,7 +25,9 @@ class CacheManager:
     PREFIX_GAME = "game"
     PREFIX_LIVE = "live"
     PREFIX_STATS = "stats"
-    
+    PREFIX_PREDICTIONS = "predictions"
+    PREFIX_MODEL = "model"
+
     # Default TTL values (in seconds)
     TTL_STANDINGS = 300  # 5 minutes
     TTL_TEAM = 3600  # 1 hour
@@ -33,6 +35,8 @@ class CacheManager:
     TTL_GAME_FINAL = 86400  # 24 hours for completed games
     TTL_GAME_LIVE = 30  # 30 seconds for live games
     TTL_STATS = 600  # 10 minutes
+    TTL_PREDICTIONS = 3600  # 1 hour for predictions
+    TTL_MODEL = 86400  # 24 hours for model metadata
     
     def __init__(self):
         self._client: Optional[redis.Redis] = None
@@ -187,7 +191,44 @@ class CacheManager:
         """Cache player season stats."""
         key = self._make_key(self.PREFIX_STATS, "player", player_id, season)
         return self.set(key, stats, self.TTL_STATS)
-    
+
+    # Prediction caching methods
+
+    def get_predictions(self, season: str) -> Optional[dict]:
+        """Get cached predictions for all teams in a season."""
+        key = self._make_key(self.PREFIX_PREDICTIONS, "all", season)
+        return self.get(key)
+
+    def set_predictions(self, season: str, predictions: dict) -> bool:
+        """Cache predictions for all teams in a season."""
+        key = self._make_key(self.PREFIX_PREDICTIONS, "all", season)
+        return self.set(key, predictions, self.TTL_PREDICTIONS)
+
+    def get_team_prediction(self, season: str, team_id: int) -> Optional[dict]:
+        """Get cached prediction for a single team."""
+        key = self._make_key(self.PREFIX_PREDICTIONS, season, team_id)
+        return self.get(key)
+
+    def set_team_prediction(self, season: str, team_id: int, prediction: dict) -> bool:
+        """Cache prediction for a single team."""
+        key = self._make_key(self.PREFIX_PREDICTIONS, season, team_id)
+        return self.set(key, prediction, self.TTL_PREDICTIONS)
+
+    def invalidate_predictions(self, season: str) -> int:
+        """Invalidate all prediction caches for a season."""
+        pattern = f"{self.PREFIX_PREDICTIONS}:*{season}*"
+        return self.delete_pattern(pattern)
+
+    def get_model_info(self) -> Optional[dict]:
+        """Get cached model metadata."""
+        key = self._make_key(self.PREFIX_MODEL, "active")
+        return self.get(key)
+
+    def set_model_info(self, info: dict) -> bool:
+        """Cache model metadata."""
+        key = self._make_key(self.PREFIX_MODEL, "active")
+        return self.set(key, info, self.TTL_MODEL)
+
     def check_connection(self) -> bool:
         """Check if Redis connection is working."""
         try:

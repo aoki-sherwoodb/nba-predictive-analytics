@@ -60,8 +60,8 @@ class IngestionConfig:
     poll_interval: int = int(os.getenv("INGESTION_POLL_INTERVAL", "300"))  # 5 minutes
     # Number of seasons of historical data to fetch
     historical_seasons: int = int(os.getenv("HISTORICAL_SEASONS", "3"))
-    # Current NBA season (format: "2024-25")
-    current_season: str = os.getenv("CURRENT_SEASON", "2024-25")
+    # Current NBA season (format: "2025-26")
+    current_season: str = os.getenv("CURRENT_SEASON", "2025-26")
 
 
 @dataclass

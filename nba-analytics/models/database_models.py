@@ -57,7 +57,7 @@ class Player(Base):
     weight = Column(Integer)  # in pounds
     birth_date = Column(Date)
     country = Column(String(100))
-    years_pro = Column(Integer)
+    years_pro = Column(String(10))  # Can be "R" for rookie or number
     is_active = Column(Boolean, default=True)
     
     # Timestamps
