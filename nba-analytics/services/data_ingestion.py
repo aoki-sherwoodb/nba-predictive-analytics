@@ -591,25 +591,163 @@ class NBADataIngestionService:
                 logger.error(f"Box score ingestion failed for game {game_id}: {e}")
                 raise
     
+    def ingest_recent_games(self, days: int = 7, season: str = None) -> int:
+        """
+        Ingest games from the past N days using LeagueGameFinder.
+        Also ingests box scores for completed games.
+        Returns number of games ingested.
+        """
+        season = season or config.ingestion.current_season
+        logger.info(f"Ingesting games from past {days} days for season {season}")
+
+        self._rate_limit()
+
+        with db_manager.get_session() as session:
+            log = self._log_ingestion_start(session, "recent_games")
+
+            try:
+                # Calculate date range
+                end_date = date.today()
+                start_date = end_date - timedelta(days=days)
+
+                # Fetch games from API
+                game_finder = leaguegamefinder.LeagueGameFinder(
+                    date_from_nullable=start_date.strftime('%m/%d/%Y'),
+                    date_to_nullable=end_date.strftime('%m/%d/%Y'),
+                    league_id_nullable='00',
+                    season_nullable=season,
+                    season_type_nullable='Regular Season'
+                )
+                games_data = game_finder.get_normalized_dict()
+
+                # Process games - each row is one team's perspective
+                # So we need to pair them up
+                games_by_id = {}
+                for row in games_data.get('LeagueGameFinderResults', []):
+                    game_id = row.get('GAME_ID')
+                    if not game_id:
+                        continue
+
+                    if game_id not in games_by_id:
+                        games_by_id[game_id] = []
+                    games_by_id[game_id].append(row)
+
+                count = 0
+                game_ids_to_get_boxscore = []
+
+                for game_id, team_rows in games_by_id.items():
+                    if len(team_rows) != 2:
+                        continue
+
+                    # Determine home and away teams
+                    home_row = None
+                    away_row = None
+                    for row in team_rows:
+                        matchup = row.get('MATCHUP', '')
+                        if ' vs. ' in matchup:
+                            home_row = row
+                        elif ' @ ' in matchup:
+                            away_row = row
+
+                    if not home_row or not away_row:
+                        continue
+
+                    # Get teams from database
+                    home_team = session.query(Team).filter(
+                        Team.nba_id == home_row['TEAM_ID']
+                    ).first()
+                    away_team = session.query(Team).filter(
+                        Team.nba_id == away_row['TEAM_ID']
+                    ).first()
+
+                    if not home_team or not away_team:
+                        continue
+
+                    # Parse game date
+                    game_date_str = home_row.get('GAME_DATE')
+                    try:
+                        game_date = datetime.strptime(game_date_str, '%Y-%m-%d').date()
+                    except:
+                        game_date = date.today()
+
+                    # Determine status based on scores
+                    home_score = home_row.get('PTS', 0) or 0
+                    away_score = away_row.get('PTS', 0) or 0
+                    status = 'final' if home_score > 0 or away_score > 0 else 'scheduled'
+
+                    # Upsert game
+                    stmt = insert(Game).values(
+                        nba_game_id=game_id,
+                        season=season,
+                        season_type='Regular Season',
+                        game_date=game_date,
+                        home_team_id=home_team.id,
+                        away_team_id=away_team.id,
+                        home_score=home_score,
+                        away_score=away_score,
+                        status=status,
+                    ).on_conflict_do_update(
+                        index_elements=['nba_game_id'],
+                        set_={
+                            'home_score': home_score,
+                            'away_score': away_score,
+                            'status': status,
+                            'updated_at': datetime.utcnow()
+                        }
+                    )
+                    session.execute(stmt)
+                    count += 1
+
+                    # Track completed games for box score ingestion
+                    if status == 'final':
+                        game_ids_to_get_boxscore.append(game_id)
+
+                session.commit()
+                logger.info(f"Ingested {count} games from past {days} days")
+
+                # Now ingest box scores for completed games (with rate limiting)
+                box_score_count = 0
+                for game_id in game_ids_to_get_boxscore[:20]:  # Limit to 20 to avoid rate limits
+                    try:
+                        self._rate_limit()
+                        box_count = self.ingest_game_box_score(game_id)
+                        box_score_count += box_count
+                    except Exception as e:
+                        logger.warning(f"Failed to ingest box score for {game_id}: {e}")
+                        continue
+
+                logger.info(f"Ingested {box_score_count} player stats from box scores")
+
+                self._log_ingestion_complete(session, log, count)
+                return count
+
+            except Exception as e:
+                logger.error(f"Recent games ingestion failed: {e}", exc_info=True)
+                self._log_ingestion_complete(session, log, 0, str(e))
+                return 0
+
     def run_full_ingestion(self, season: str = None):
         """
         Run a full data ingestion cycle.
         """
         season = season or config.ingestion.current_season
         logger.info(f"Starting full ingestion for season {season}")
-        
+
         # 1. Ingest teams
         self.ingest_teams()
-        
+
         # 2. Ingest standings
         self.ingest_standings(season)
-        
+
         # 3. Ingest rosters
         self.ingest_all_rosters(season)
-        
+
         # 4. Ingest today's games
         self.ingest_todays_games()
-        
+
+        # 5. Ingest recent games with box scores
+        self.ingest_recent_games(days=7, season=season)
+
         logger.info("Full ingestion complete!")
 
 

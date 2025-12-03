@@ -421,14 +421,27 @@ def get_stat_leaders(
         func.sum(PlayerGameStats.free_throws_attempted).label('total_fta'),
         func.count(PlayerGameStats.id).label('games_played')
     ).group_by(PlayerGameStats.player_id).having(
-        func.count(PlayerGameStats.id) >= 5  # Minimum games played
+        func.count(PlayerGameStats.id) >= 1  # Minimum games played
     ).subquery()
     
     # Join with player info
     results = db.query(
         Player,
         Team,
-        subquery
+        subquery.c.avg_points,
+        subquery.c.avg_rebounds,
+        subquery.c.avg_assists,
+        subquery.c.avg_steals,
+        subquery.c.avg_blocks,
+        subquery.c.avg_turnovers,
+        subquery.c.avg_minutes,
+        subquery.c.avg_plus_minus,
+        subquery.c.total_fgm,
+        subquery.c.total_fga,
+        subquery.c.total_3pm,
+        subquery.c.total_3pa,
+        subquery.c.total_ftm,
+        subquery.c.total_fta,
     ).join(
         subquery, Player.id == subquery.c.player_id
     ).join(
@@ -436,38 +449,44 @@ def get_stat_leaders(
     ).order_by(
         desc(getattr(subquery.c, f'avg_{stat}'))
     ).limit(limit).all()
-    
+
     leaders = []
-    for player, team, stats in results:
+    for row in results:
+        player = row[0]
+        team = row[1]
+        avg_points, avg_rebounds, avg_assists, avg_steals, avg_blocks = row[2:7]
+        avg_turnovers, avg_minutes, avg_plus_minus = row[7:10]
+        total_fgm, total_fga, total_3pm, total_3pa, total_ftm, total_fta = row[10:16]
+
         fg_pct = None
-        if stats.total_fga and stats.total_fga > 0:
-            fg_pct = round(stats.total_fgm / stats.total_fga * 100, 1)
-        
+        if total_fga and total_fga > 0:
+            fg_pct = round(total_fgm / total_fga * 100, 1)
+
         three_pct = None
-        if stats.total_3pa and stats.total_3pa > 0:
-            three_pct = round(stats.total_3pm / stats.total_3pa * 100, 1)
-        
+        if total_3pa and total_3pa > 0:
+            three_pct = round(total_3pm / total_3pa * 100, 1)
+
         ft_pct = None
-        if stats.total_fta and stats.total_fta > 0:
-            ft_pct = round(stats.total_ftm / stats.total_fta * 100, 1)
-        
+        if total_fta and total_fta > 0:
+            ft_pct = round(total_ftm / total_fta * 100, 1)
+
         leaders.append(PlayerStatsResponse(
             player_id=player.id,
             player_name=player.full_name,
             team_abbr=team.abbreviation,
-            minutes=round(stats.avg_minutes or 0, 1),
-            points=round(stats.avg_points or 0),
-            rebounds=round(stats.avg_rebounds or 0),
-            assists=round(stats.avg_assists or 0),
-            steals=round(stats.avg_steals or 0),
-            blocks=round(stats.avg_blocks or 0),
-            turnovers=round(stats.avg_turnovers or 0),
+            minutes=round(avg_minutes or 0, 1),
+            points=round(avg_points or 0),
+            rebounds=round(avg_rebounds or 0),
+            assists=round(avg_assists or 0),
+            steals=round(avg_steals or 0),
+            blocks=round(avg_blocks or 0),
+            turnovers=round(avg_turnovers or 0),
             fg_pct=fg_pct,
             three_pct=three_pct,
             ft_pct=ft_pct,
-            plus_minus=round(stats.avg_plus_minus or 0)
+            plus_minus=round(avg_plus_minus or 0)
         ))
-    
+
     return leaders
 
 

@@ -22,7 +22,7 @@ class TeamSeasonStats(Base):
 
     id = Column(Integer, primary_key=True)
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
-    season = Column(String(10), nullable=False, index=True)  # "2024-25"
+    season = Column(String(10), nullable=False)  # "2024-25"
     games_played = Column(Integer, default=0)
 
     # Record
@@ -111,6 +111,7 @@ class TeamPrediction(Base):
     team = relationship("Team")
 
     __table_args__ = (
+        UniqueConstraint("season", "team_id", "prediction_date", name="uq_team_prediction"),
         Index("ix_team_predictions_date", "prediction_date"),
         Index("ix_team_predictions_season_team", "season", "team_id"),
     )

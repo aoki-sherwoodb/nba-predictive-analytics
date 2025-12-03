@@ -317,12 +317,17 @@ def render_todays_games():
     """Render today's games page."""
     st.markdown('<h2 class="sub-header">Today\'s Games</h2>', unsafe_allow_html=True)
     st.caption(f"Date: {date.today().strftime('%B %d, %Y')}")
-    
+
     games = get_todays_games()
-    
+
     if not games:
-        st.info("No games scheduled for today.")
-        return
+        st.info("No games scheduled for today. Showing recent games instead.")
+        st.markdown("### Recent Completed Games")
+        recent = get_recent_games(days=7)
+        if not recent:
+            st.warning("No recent games available.")
+            return
+        games = recent[:12]  # Show up to 12 recent games
     
     # Auto-refresh toggle
     auto_refresh = st.checkbox("Auto-refresh (every 30 seconds)", value=False)
@@ -415,10 +420,10 @@ def render_leaders():
     base_cols = ['Player', 'Team', 'MPG']
     stat_cols = {
         'points': ['PPG', 'FG%', '3P%', 'FT%'],
-        'rebounds': ['RPG', 'PPG', 'MPG'],
+        'rebounds': ['RPG', 'PPG'],
         'assists': ['APG', 'PPG', 'TOV'],
-        'steals': ['SPG', 'PPG', 'MPG'],
-        'blocks': ['BPG', 'PPG', 'MPG'],
+        'steals': ['SPG', 'PPG'],
+        'blocks': ['BPG', 'PPG'],
     }
     cols_to_show = base_cols + stat_cols[stat_category]
     
