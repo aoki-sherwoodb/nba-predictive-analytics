@@ -39,6 +39,12 @@ plotly==5.18.0
 python-dotenv==1.0.0
 schedule==1.2.1
 
+# GCP Cloud Dependencies
+google-cloud-storage>=2.14.0
+pg8000>=1.30.0
+cloud-sql-python-connector[pg8000]>=1.6.0
+google-cloud-secret-manager>=2.16.0
+
 # Development & Testing
 pytest==7.4.4
 pytest-asyncio==0.23.3
