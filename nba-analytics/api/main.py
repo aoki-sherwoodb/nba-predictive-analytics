@@ -57,6 +57,7 @@ class PlayerResponse(BaseModel):
 
 class StandingResponse(BaseModel):
     team_id: int
+    nba_team_id: int
     team_name: str
     team_abbr: str
     conference: str
@@ -353,6 +354,7 @@ def get_standings(
     for standing, team in standings_data:
         record = StandingResponse(
             team_id=team.id,
+            nba_team_id=team.nba_id,
             team_name=team.name,
             team_abbr=team.abbreviation,
             conference=team.conference or "",
@@ -431,7 +433,7 @@ def get_todays_games(db: Session = Depends(get_db)):
 
 @app.get("/api/games/recent", response_model=List[GameResponse], tags=["Games"])
 def get_recent_games(
-    days: int = Query(7, ge=1, le=30, description="Number of days to look back"),
+    days: int = Query(7, ge=1, le=365, description="Number of days to look back"),
     team_id: Optional[int] = Query(None, description="Filter by team"),
     include_all_statuses: bool = Query(
         False, description="Include scheduled/live games in addition to final games"
