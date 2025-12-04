@@ -151,7 +151,7 @@ resource "google_cloud_run_v2_service" "dashboard" {
       image = "${var.artifact_registry_url}/dashboard:latest"
 
       ports {
-        container_port = 8501
+        container_port = 3000
       }
 
       resources {
@@ -163,7 +163,7 @@ resource "google_cloud_run_v2_service" "dashboard" {
 
       # Environment variables
       env {
-        name  = "API_URL"
+        name  = "NEXT_PUBLIC_API_URL"
         value = google_cloud_run_v2_service.api.uri
       }
 

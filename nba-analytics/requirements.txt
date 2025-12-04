@@ -15,7 +15,7 @@ asyncpg==0.29.0
 redis==5.0.1
 
 # NBA Data
-nba_api==1.11.3
+nba_api>=1.11.3
 
 # Data Processing
 pandas==2.2.3

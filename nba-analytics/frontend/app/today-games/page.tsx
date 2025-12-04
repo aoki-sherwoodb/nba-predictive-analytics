@@ -14,10 +14,10 @@ import {
   Switch,
 } from '@mui/material';
 import { api } from '@/lib/api';
-import type { Game } from '@/lib/types';
+import type { RecentGame } from '@/lib/types';
 
 export default function TodayGamesPage() {
-  const [games, setGames] = useState<Game[]>([]);
+  const [games, setGames] = useState<RecentGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -121,7 +121,7 @@ export default function TodayGamesPage() {
       ) : (
         <Grid container spacing={3}>
           {games.map((game) => (
-            <Grid item xs={12} sm={6} md={4} key={game.game_id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={game.game_id}>
               <Card
                 sx={{
                   height: '100%',

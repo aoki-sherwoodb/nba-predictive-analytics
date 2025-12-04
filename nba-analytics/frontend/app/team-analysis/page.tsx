@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { api } from '@/lib/api';
-import type { Team, Game } from '@/lib/types';
+import type { Team, RecentGame } from '@/lib/types';
 
 interface GameData {
   date: string;
@@ -38,7 +38,7 @@ interface GameData {
 export default function TeamAnalysisPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [games, setGames] = useState<Game[]>([]);
+  const [games, setGames] = useState<RecentGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [gamesLoading, setGamesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,10 +73,10 @@ export default function TeamAnalysisPage() {
       try {
         setGamesLoading(true);
         // Fetch all games for the season (set days very high to get all games)
-        const data = await api.getRecentGames(365, selectedTeamId);
+        const data: RecentGame[] = await api.getRecentGames({ days: 365, team_id: selectedTeamId });
         // Filter to only include games involving this team
         const teamGames = data.filter(
-          (game) =>
+          (game: RecentGame) =>
             game.home_team.id === selectedTeamId || game.away_team.id === selectedTeamId
         );
         setGames(teamGames);
@@ -202,7 +202,7 @@ export default function TeamAnalysisPage() {
         <>
           {/* Stats Cards */}
           <Grid container spacing={2} sx={{ mb: 4 }}>
-            <Grid item xs={6} sm={3}>
+            <Grid size={{ xs: 6, sm: 3 }}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -214,7 +214,7 @@ export default function TeamAnalysisPage() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid size={{ xs: 6, sm: 3 }}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -229,7 +229,7 @@ export default function TeamAnalysisPage() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid size={{ xs: 6, sm: 3 }}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -246,7 +246,7 @@ export default function TeamAnalysisPage() {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid size={{ xs: 6, sm: 3 }}>
               <Card>
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>

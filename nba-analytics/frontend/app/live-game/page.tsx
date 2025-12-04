@@ -185,7 +185,7 @@ export default function LiveGamePage() {
 
       {/* Game Selector and Auto-Refresh */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={8}>
+        <Grid size={{ xs: 12, md: 8 }}>
           <FormControl fullWidth>
             <InputLabel>Select Game</InputLabel>
             <Select
@@ -202,7 +202,7 @@ export default function LiveGamePage() {
             </Select>
           </FormControl>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
           <FormControlLabel
             control={
               <Switch
@@ -228,7 +228,7 @@ export default function LiveGamePage() {
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Grid container spacing={2} alignItems="center">
-                <Grid item xs={4} textAlign="center">
+                <Grid size={{ xs: 4 }} sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" fontWeight="bold">
                     {selectedGame.away_team_name}
                   </Typography>
@@ -236,7 +236,7 @@ export default function LiveGamePage() {
                     {selectedGame.away_score}
                   </Typography>
                 </Grid>
-                <Grid item xs={4} textAlign="center">
+                <Grid size={{ xs: 4 }} sx={{ textAlign: 'center' }}>
                   <Typography variant="h5" fontWeight="bold">
                     VS
                   </Typography>
@@ -253,7 +253,7 @@ export default function LiveGamePage() {
                     </Typography>
                   )}
                 </Grid>
-                <Grid item xs={4} textAlign="center">
+                <Grid size={{ xs: 4 }} sx={{ textAlign: 'center' }}>
                   <Typography variant="h6" fontWeight="bold">
                     {selectedGame.home_team_name}
                   </Typography>
@@ -341,7 +341,7 @@ export default function LiveGamePage() {
             <Box>
               {/* Filters */}
               <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <FormControl fullWidth>
                     <InputLabel>Filter by Player</InputLabel>
                     <Select
@@ -375,7 +375,7 @@ export default function LiveGamePage() {
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={6} md={4}>
+                <Grid size={{ xs: 6, md: 4 }}>
                   <FormControlLabel
                     control={
                       <Switch
@@ -387,7 +387,7 @@ export default function LiveGamePage() {
                     label={`${selectedGame.away_team_abbr} (Away)`}
                   />
                 </Grid>
-                <Grid item xs={6} md={4}>
+                <Grid size={{ xs: 6, md: 4 }}>
                   <FormControlLabel
                     control={
                       <Switch
@@ -467,7 +467,7 @@ export default function LiveGamePage() {
                       TIMEOUT: '⏸️',
                       SUBSTITUTION: '🔀',
                     };
-                    const icon = eventIcons[play.event_type] || '📋';
+                    const icon = play.event_type ? eventIcons[play.event_type] || '📋' : '📋';
                     const isScore = play.event_type === 'SHOT_MADE' || play.event_type === 'FREE_THROW';
 
                     return (

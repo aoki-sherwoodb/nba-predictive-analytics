@@ -77,12 +77,12 @@ export default function StandingsPage() {
         Conference Standings
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Season: {standings.season} | Last updated: {new Date(standings.updated_at).toLocaleString()}
+        Season: {standings.season || 'Current'} | Last updated: {standings.updated_at ? new Date(standings.updated_at).toLocaleString() : 'N/A'}
       </Typography>
 
       <Grid container spacing={3}>
         {/* Eastern Conference */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Typography variant="h5" gutterBottom color="primary.main" fontWeight="600">
             Eastern Conference
           </Typography>
@@ -130,7 +130,7 @@ export default function StandingsPage() {
         </Grid>
 
         {/* Western Conference */}
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Typography variant="h5" gutterBottom color="error.main" fontWeight="600">
             Western Conference
           </Typography>

@@ -20,6 +20,10 @@ from services.cache import cache_manager
 from services.data_ingestion import ingestion_service
 from services.live_game_service import live_game_service
 
+# NBA API imports for fresh data
+import time
+from nba_api.stats.endpoints import leagueleaders, playercareerstats, commonallplayers
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -304,6 +308,136 @@ def get_players(
     return players
 
 
+# Player Search endpoint - must be before {player_id} route
+@app.get("/api/players/search", response_model=List[dict], tags=["Players"])
+def search_players(
+    q: str = Query(..., min_length=2, description="Search query (player name)"),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    """Search for players by name."""
+    # Search in local database first
+    players = db.query(Player).filter(
+        Player.full_name.ilike(f"%{q}%"),
+        Player.is_active == True
+    ).limit(limit).all()
+
+    results = []
+    for player in players:
+        team_abbr = None
+        if player.team:
+            team_abbr = player.team.abbreviation
+
+        results.append({
+            "player_id": player.nba_id,  # Use NBA ID for API calls
+            "player_name": player.full_name,
+            "team_abbr": team_abbr,
+            "is_active": player.is_active
+        })
+
+    return results
+
+
+# Player Compare endpoint - must be before {player_id} route
+@app.get("/api/players/compare", tags=["Players"])
+def compare_players_route(
+    player1_id: int = Query(..., description="First player's NBA ID"),
+    player2_id: int = Query(..., description="Second player's NBA ID"),
+    season: str = Query(default=None, description="Season (e.g., '2024-25')"),
+    db: Session = Depends(get_db)
+):
+    """Compare two players' stats side by side."""
+    # Import helper function at runtime to avoid circular reference
+    from nba_api.stats.endpoints import playercareerstats
+
+    season = season or config.ingestion.current_season
+
+    def fetch_player_stats(pid: int, szn: str) -> Optional[Dict[str, Any]]:
+        """Fetch player season stats from NBA API."""
+        try:
+            time.sleep(0.6)  # Rate limiting
+            career = playercareerstats.PlayerCareerStats(
+                player_id=pid,
+                per_mode36='PerGame'
+            )
+            df = career.season_totals_regular_season.get_data_frame()
+            if df.empty:
+                return None
+            # Get most recent season
+            row = df.tail(1).iloc[0]
+            return {
+                'player_id': int(row['PLAYER_ID']),
+                'team_abbr': row['TEAM_ABBREVIATION'],
+                'games_played': int(row['GP']),
+                'minutes': float(row['MIN']),
+                'points': float(row['PTS']),
+                'rebounds': float(row['REB']),
+                'assists': float(row['AST']),
+                'steals': float(row['STL']),
+                'blocks': float(row['BLK']),
+                'turnovers': float(row['TOV']),
+                'fg_pct': float(row['FG_PCT']) * 100 if row['FG_PCT'] else None,
+                'fg3_pct': float(row['FG3_PCT']) * 100 if row['FG3_PCT'] else None,
+                'ft_pct': float(row['FT_PCT']) * 100 if row['FT_PCT'] else None,
+            }
+        except Exception as e:
+            logger.error(f"Error fetching player stats for {pid}: {e}")
+            return None
+
+    # Get player info from local DB
+    player1_db = db.query(Player).filter(Player.nba_id == player1_id).first()
+    player2_db = db.query(Player).filter(Player.nba_id == player2_id).first()
+
+    # Fetch stats from NBA API
+    stats1 = fetch_player_stats(player1_id, season)
+    stats2 = fetch_player_stats(player2_id, season)
+
+    if not stats1:
+        raise HTTPException(status_code=404, detail=f"Stats not found for player {player1_id}")
+    if not stats2:
+        raise HTTPException(status_code=404, detail=f"Stats not found for player {player2_id}")
+
+    # Build response
+    player1_name = player1_db.full_name if player1_db else f"Player {player1_id}"
+    player2_name = player2_db.full_name if player2_db else f"Player {player2_id}"
+
+    return {
+        "season": season,
+        "player1": {
+            "player_id": player1_id,
+            "player_name": player1_name,
+            "team_abbr": stats1['team_abbr'],
+            "games_played": stats1['games_played'],
+            "minutes": round(stats1['minutes'], 1),
+            "points": round(stats1['points'], 1),
+            "rebounds": round(stats1['rebounds'], 1),
+            "assists": round(stats1['assists'], 1),
+            "steals": round(stats1['steals'], 1),
+            "blocks": round(stats1['blocks'], 1),
+            "turnovers": round(stats1['turnovers'], 1),
+            "fg_pct": round(stats1['fg_pct'], 1) if stats1['fg_pct'] else None,
+            "fg3_pct": round(stats1['fg3_pct'], 1) if stats1['fg3_pct'] else None,
+            "ft_pct": round(stats1['ft_pct'], 1) if stats1['ft_pct'] else None
+        },
+        "player2": {
+            "player_id": player2_id,
+            "player_name": player2_name,
+            "team_abbr": stats2['team_abbr'],
+            "games_played": stats2['games_played'],
+            "minutes": round(stats2['minutes'], 1),
+            "points": round(stats2['points'], 1),
+            "rebounds": round(stats2['rebounds'], 1),
+            "assists": round(stats2['assists'], 1),
+            "steals": round(stats2['steals'], 1),
+            "blocks": round(stats2['blocks'], 1),
+            "turnovers": round(stats2['turnovers'], 1),
+            "fg_pct": round(stats2['fg_pct'], 1) if stats2['fg_pct'] else None,
+            "fg3_pct": round(stats2['fg3_pct'], 1) if stats2['fg3_pct'] else None,
+            "ft_pct": round(stats2['ft_pct'], 1) if stats2['ft_pct'] else None
+        }
+    }
+
+
 @app.get("/api/players/{player_id}", response_model=PlayerResponse, tags=["Players"])
 def get_player(player_id: int, db: Session = Depends(get_db)):
     """Get a specific player by ID."""
@@ -550,18 +684,145 @@ def get_game_shots(game_id: str):
 
 
 # Statistics endpoints
-@app.get(
-    "/api/stats/leaders", response_model=List[PlayerStatsResponse], tags=["Statistics"]
-)
+
+def fetch_league_leaders(stat_category: str, season: str, limit: int = 50) -> List[Dict[str, Any]]:
+    """
+    Fetch fresh stat leaders from NBA API's LeagueLeaders endpoint.
+
+    Args:
+        stat_category: One of PTS, REB, AST, STL, BLK, EFF
+        season: Season string (e.g., '2024-25')
+        limit: Number of leaders to return
+
+    Returns:
+        List of player stats dictionaries
+    """
+    cache_key = f"league_leaders:{stat_category}:{season}"
+
+    # Check cache first (5 minute TTL) - handle Redis being unavailable
+    try:
+        cached = cache_manager.client.get(cache_key) if cache_manager.client else None
+        if cached:
+            import json
+            try:
+                return json.loads(cached)[:limit]
+            except:
+                pass
+    except Exception as e:
+        logger.debug(f"Cache unavailable: {e}")
+
+    try:
+        # Rate limiting - NBA API recommends 0.6s between calls
+        time.sleep(0.6)
+
+        leaders_response = leagueleaders.LeagueLeaders(
+            league_id='00',
+            per_mode48='PerGame',
+            scope='S',  # S = all players
+            season=season,
+            season_type_all_star='Regular Season',
+            stat_category_abbreviation=stat_category
+        )
+
+        df = leaders_response.league_leaders.get_data_frame()
+
+        if df.empty:
+            return []
+
+        # Convert to list of dicts
+        results = []
+        for _, row in df.head(limit).iterrows():
+            results.append({
+                'player_id': int(row['PLAYER_ID']),
+                'rank': int(row['RANK']),
+                'player_name': row['PLAYER'],
+                'team': row['TEAM'],
+                'gp': int(row['GP']),
+                'min': float(row['MIN']),
+                'pts': float(row['PTS']),
+                'reb': float(row['REB']),
+                'ast': float(row['AST']),
+                'stl': float(row['STL']),
+                'blk': float(row['BLK']),
+                'tov': float(row['TOV']),
+                'fg_pct': float(row['FG_PCT']) * 100 if row['FG_PCT'] else None,
+                'fg3_pct': float(row['FG3_PCT']) * 100 if row['FG3_PCT'] else None,
+                'ft_pct': float(row['FT_PCT']) * 100 if row['FT_PCT'] else None,
+                'eff': float(row['EFF']) if 'EFF' in row else None,
+                'ast_tov': float(row['AST_TOV']) if 'AST_TOV' in row else None,
+            })
+
+        # Cache results for 5 minutes (if Redis available)
+        try:
+            if cache_manager.client:
+                import json
+                cache_manager.client.setex(cache_key, 300, json.dumps(results))
+        except Exception as e:
+            logger.debug(f"Could not cache results: {e}")
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Error fetching league leaders from NBA API: {e}")
+        return []
+
+
+@app.get("/api/stats/leaders", response_model=List[PlayerStatsResponse], tags=["Statistics"])
 def get_stat_leaders(
-    stat: str = Query(
-        "points",
-        description="Stat to rank by (points, rebounds, assists, steals, blocks)",
-    ),
+    stat: str = Query("points", description="Stat to rank by (points, rebounds, assists, steals, blocks, efficiency)"),
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    """Get statistical leaders for a given category."""
+    """Get statistical leaders for a given category using fresh NBA API data."""
+    # Map stat names to NBA API stat category abbreviations
+    stat_category_map = {
+        "points": "PTS",
+        "rebounds": "REB",
+        "assists": "AST",
+        "steals": "STL",
+        "blocks": "BLK",
+        "efficiency": "EFF",
+    }
+
+    if stat not in stat_category_map:
+        raise HTTPException(status_code=400, detail=f"Invalid stat: {stat}. Valid options: {list(stat_category_map.keys())}")
+
+    stat_category = stat_category_map[stat]
+    season = config.ingestion.current_season
+
+    # Fetch fresh data from NBA API
+    leaders_data = fetch_league_leaders(stat_category, season, limit)
+
+    if not leaders_data:
+        # Fallback to database if NBA API fails
+        logger.warning("NBA API unavailable, falling back to database")
+        return get_stat_leaders_from_db(stat, limit, db)
+
+    # Convert to response format
+    leaders = []
+    for player in leaders_data:
+        leaders.append(PlayerStatsResponse(
+            player_id=player['player_id'],
+            player_name=player['player_name'],
+            team_abbr=player['team'],
+            minutes=round(player['min'], 1),
+            points=round(player['pts']),
+            rebounds=round(player['reb']),
+            assists=round(player['ast']),
+            steals=round(player['stl']),
+            blocks=round(player['blk']),
+            turnovers=round(player['tov']),
+            fg_pct=round(player['fg_pct'], 1) if player['fg_pct'] else None,
+            three_pct=round(player['fg3_pct'], 1) if player['fg3_pct'] else None,
+            ft_pct=round(player['ft_pct'], 1) if player['ft_pct'] else None,
+            plus_minus=0  # Not available from LeagueLeaders endpoint
+        ))
+
+    return leaders
+
+
+def get_stat_leaders_from_db(stat: str, limit: int, db: Session) -> List[PlayerStatsResponse]:
+    """Fallback: Get stat leaders from local database."""
     stat_column_map = {
         "points": PlayerGameStats.points,
         "rebounds": PlayerGameStats.total_rebounds,
@@ -571,7 +832,7 @@ def get_stat_leaders(
     }
 
     if stat not in stat_column_map:
-        raise HTTPException(status_code=400, detail=f"Invalid stat: {stat}")
+        return []
 
     stat_column = stat_column_map[stat]
 
@@ -599,7 +860,7 @@ def get_stat_leaders(
         .join(Game, PlayerGameStats.game_id == Game.id)
         .filter(Game.season == current_season)
         .group_by(PlayerGameStats.player_id)
-        .having(func.count(PlayerGameStats.id) >= 1)  # Minimum games played
+        .having(func.count(PlayerGameStats.id) >= 1)
         .subquery()
     )
 
@@ -713,6 +974,111 @@ def get_player_game_stats(
         )
 
     return result
+
+
+# Player Comparison Models
+class PlayerCompareStats(BaseModel):
+    """Stats for a single player in comparison."""
+    player_id: int
+    player_name: str
+    team_abbr: str
+    games_played: int
+    minutes: float
+    points: float
+    rebounds: float
+    assists: float
+    steals: float
+    blocks: float
+    turnovers: float
+    fg_pct: Optional[float]
+    fg3_pct: Optional[float]
+    ft_pct: Optional[float]
+
+
+class PlayerCompareResponse(BaseModel):
+    """Response model for player comparison."""
+    season: str
+    player1: PlayerCompareStats
+    player2: PlayerCompareStats
+
+
+class PlayerSearchResult(BaseModel):
+    """Search result for player lookup."""
+    player_id: int
+    player_name: str
+    team_abbr: Optional[str]
+    is_active: bool
+
+
+def get_player_season_stats(player_id: int, season: str) -> Optional[Dict[str, Any]]:
+    """Fetch current season stats for a player from NBA API."""
+    cache_key = f"player_stats:{player_id}:{season}"
+
+    # Check cache first (5 minute TTL) - handle Redis being unavailable
+    try:
+        cached = cache_manager.client.get(cache_key) if cache_manager.client else None
+        if cached:
+            import json
+            try:
+                return json.loads(cached)
+            except:
+                pass
+    except Exception as e:
+        logger.debug(f"Cache unavailable: {e}")
+
+    try:
+        time.sleep(0.6)  # Rate limiting
+
+        career = playercareerstats.PlayerCareerStats(
+            player_id=player_id,
+            per_mode36='PerGame'
+        )
+
+        # Get regular season stats
+        df = career.season_totals_regular_season.get_data_frame()
+
+        if df.empty:
+            return None
+
+        # Filter for current/specified season
+        season_id = f"2{season.replace('-', '')[:4]}"  # e.g., "2024-25" -> "22024"
+        season_data = df[df['SEASON_ID'] == season_id]
+
+        if season_data.empty:
+            # If specified season not found, use most recent
+            season_data = df.tail(1)
+
+        row = season_data.iloc[0]
+
+        result = {
+            'player_id': int(row['PLAYER_ID']),
+            'team_abbr': row['TEAM_ABBREVIATION'],
+            'games_played': int(row['GP']),
+            'minutes': float(row['MIN']),
+            'points': float(row['PTS']),
+            'rebounds': float(row['REB']),
+            'assists': float(row['AST']),
+            'steals': float(row['STL']),
+            'blocks': float(row['BLK']),
+            'turnovers': float(row['TOV']),
+            'fg_pct': float(row['FG_PCT']) * 100 if row['FG_PCT'] else None,
+            'fg3_pct': float(row['FG3_PCT']) * 100 if row['FG3_PCT'] else None,
+            'ft_pct': float(row['FT_PCT']) * 100 if row['FT_PCT'] else None,
+        }
+
+        # Cache for 5 minutes (if Redis available)
+        try:
+            if cache_manager.client:
+                import json
+                cache_manager.client.setex(cache_key, 300, json.dumps(result))
+        except Exception as e:
+            logger.debug(f"Could not cache results: {e}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error fetching player stats for {player_id}: {e}")
+        return None
 
 
 # Data refresh endpoints

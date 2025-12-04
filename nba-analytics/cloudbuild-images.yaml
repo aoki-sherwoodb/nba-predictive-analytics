@@ -3,6 +3,7 @@
 
 substitutions:
   _REGION: us-central1
+  _API_URL: https://nba-analytics-api-dev-273190724450.us-central1.run.app
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -20,13 +21,15 @@ steps:
       - 'Dockerfile.api'
       - '.'
 
-  # Step 2: Build Dashboard image
+  # Step 2: Build Dashboard image (Next.js frontend)
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-dashboard'
     args:
       - 'build'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/dashboard:latest'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=${_API_URL}'
       - '-f'
       - 'Dockerfile.dashboard'
       - '.'

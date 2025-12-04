@@ -60,7 +60,7 @@ export default function Home() {
 
       <Grid container spacing={3}>
         {features.map((feature) => (
-          <Grid item xs={12} sm={6} md={4} key={feature.title}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }} key={feature.title}>
             <Card
               sx={{
                 height: '100%',
@@ -113,7 +113,7 @@ export default function Home() {
           powered by a FastAPI backend and PostgreSQL database. The platform features:
         </Typography>
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Typography variant="subtitle2" color="primary" gutterBottom>
               Live Data
             </Typography>
@@ -121,7 +121,7 @@ export default function Home() {
               Real-time game scores and player statistics
             </Typography>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Typography variant="subtitle2" color="primary" gutterBottom>
               Advanced Analytics
             </Typography>
@@ -129,7 +129,7 @@ export default function Home() {
               Team performance trends and statistical analysis
             </Typography>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Typography variant="subtitle2" color="primary" gutterBottom>
               ML Predictions
             </Typography>
@@ -137,7 +137,7 @@ export default function Home() {
               LSTM-based forecasts for end-of-season outcomes
             </Typography>
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <Typography variant="subtitle2" color="primary" gutterBottom>
               Fast Performance
             </Typography>

@@ -107,7 +107,7 @@ export default function PredictionsPage() {
   const standingsMap = standings
     ? [...standings.east, ...standings.west].reduce(
         (acc, team) => {
-          acc[team.team_abbr] = team.wins;
+          acc[team.team_abbreviation] = team.wins;
           return acc;
         },
         {} as Record<string, number>
@@ -131,7 +131,7 @@ export default function PredictionsPage() {
           </AccordionSummary>
           <AccordionDetails>
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ xs: 12, sm: 4 }}>
                 <Card>
                   <CardContent>
                     <Typography color="text.secondary" gutterBottom>
@@ -141,7 +141,7 @@ export default function PredictionsPage() {
                   </CardContent>
                 </Card>
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ xs: 12, sm: 4 }}>
                 <Card>
                   <CardContent>
                     <Typography color="text.secondary" gutterBottom>
@@ -153,7 +153,7 @@ export default function PredictionsPage() {
                   </CardContent>
                 </Card>
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid size={{ xs: 12, sm: 4 }}>
                 <Card>
                   <CardContent>
                     <Typography color="text.secondary" gutterBottom>
@@ -182,7 +182,7 @@ export default function PredictionsPage() {
         <Box>
           <Grid container spacing={3}>
             {/* Eastern Conference */}
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="h5" gutterBottom color="primary.main" fontWeight="600">
                 Eastern Conference
               </Typography>
@@ -219,7 +219,7 @@ export default function PredictionsPage() {
             </Grid>
 
             {/* Western Conference */}
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="h5" gutterBottom color="error.main" fontWeight="600">
                 Western Conference
               </Typography>
@@ -293,7 +293,7 @@ export default function PredictionsPage() {
           </Typography>
           <Grid container spacing={3}>
             {/* East */}
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="h6" gutterBottom color="primary.main">
                 Eastern Conference
               </Typography>
@@ -322,7 +322,7 @@ export default function PredictionsPage() {
             </Grid>
 
             {/* West */}
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="h6" gutterBottom color="error.main">
                 Western Conference
               </Typography>
@@ -375,7 +375,7 @@ export default function PredictionsPage() {
             <>
               {/* Team Stats Cards */}
               <Grid container spacing={2} sx={{ mb: 4 }}>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Card>
                     <CardContent>
                       <Typography color="text.secondary" gutterBottom variant="body2">
@@ -390,7 +390,7 @@ export default function PredictionsPage() {
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Card>
                     <CardContent>
                       <Typography color="text.secondary" gutterBottom variant="body2">
@@ -405,7 +405,7 @@ export default function PredictionsPage() {
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Card>
                     <CardContent>
                       <Typography color="text.secondary" gutterBottom variant="body2">
@@ -420,7 +420,7 @@ export default function PredictionsPage() {
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
                   <Card>
                     <CardContent>
                       <Typography color="text.secondary" gutterBottom variant="body2">
