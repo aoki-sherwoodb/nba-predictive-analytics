@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   # PostgreSQL Database
@@ -51,7 +51,7 @@ services:
       - REDIS_PORT=6379
       - API_HOST=0.0.0.0
       - API_PORT=8000
-      - CURRENT_SEASON=2024-25
+      - CURRENT_SEASON=2025-26
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,7 +91,7 @@ services:
       - DB_PASSWORD=postgres
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - CURRENT_SEASON=2024-25
+      - CURRENT_SEASON=2025-26
     depends_on:
       postgres:
         condition: service_healthy
