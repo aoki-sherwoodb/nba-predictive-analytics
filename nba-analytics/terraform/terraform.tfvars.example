@@ -1,0 +1,78 @@
+# NBA Analytics Platform - Terraform Variables
+# Copy this file to terraform.tfvars and fill in your values
+
+# =============================================================================
+# REQUIRED - GCP Project Settings
+# =============================================================================
+
+# Your GCP project ID (must be already created)
+project_id = "your-gcp-project-id"
+
+# GCP region for resources (us-central1 is cost-effective)
+region = "us-central1"
+
+# =============================================================================
+# OPTIONAL - Environment Settings
+# =============================================================================
+
+# Environment name (dev, staging, prod)
+environment = "dev"
+
+# =============================================================================
+# OPTIONAL - Database Settings
+# =============================================================================
+
+# Cloud SQL tier (db-f1-micro for dev, db-custom-2-4096 for prod)
+db_tier = "db-f1-micro"
+
+# Database name
+db_name = "nba_analytics"
+
+# Database user
+db_user = "nba_admin"
+
+# =============================================================================
+# OPTIONAL - Redis Settings
+# =============================================================================
+
+# Redis memory size in GB (1-300)
+redis_memory_size_gb = 1
+
+# Redis tier (BASIC for dev, STANDARD_HA for prod)
+redis_tier = "BASIC"
+
+# =============================================================================
+# OPTIONAL - Cloud Run Settings
+# =============================================================================
+
+# API service settings
+api_cpu = "1"
+api_memory = "512Mi"
+api_min_instances = 0
+api_max_instances = 10
+
+# Dashboard service settings
+dashboard_cpu = "1"
+dashboard_memory = "1Gi"
+dashboard_min_instances = 0
+dashboard_max_instances = 5
+
+# =============================================================================
+# OPTIONAL - Networking Settings
+# =============================================================================
+
+# VPC subnet CIDR
+subnet_cidr = "10.0.0.0/24"
+
+# VPC connector CIDR (for serverless access)
+vpc_connector_cidr = "10.8.0.0/28"
+
+# =============================================================================
+# OPTIONAL - Labels for resources
+# =============================================================================
+
+labels = {
+  project     = "nba-analytics"
+  managed-by  = "terraform"
+  team        = "data-engineering"
+}

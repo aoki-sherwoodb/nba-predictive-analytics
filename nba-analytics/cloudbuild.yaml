@@ -1,0 +1,99 @@
+# Cloud Build configuration for NBA Analytics Platform
+# Builds and deploys API and Dashboard to Cloud Run
+
+substitutions:
+  _REGION: us-central1
+  _ENVIRONMENT: dev
+  _API_SERVICE: nba-analytics-api-${_ENVIRONMENT}
+  _DASHBOARD_SERVICE: nba-analytics-dashboard-${_ENVIRONMENT}
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+steps:
+  # Step 1: Build API image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-api'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/api:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/api:latest'
+      - '-f'
+      - 'Dockerfile.api'
+      - '.'
+
+  # Step 2: Build Dashboard image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-dashboard'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/dashboard:${SHORT_SHA}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/dashboard:latest'
+      - '-f'
+      - 'Dockerfile.dashboard'
+      - '.'
+
+  # Step 3: Push API image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-api'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/api'
+    waitFor: ['build-api']
+
+  # Step 4: Push Dashboard image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-dashboard'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/dashboard'
+    waitFor: ['build-dashboard']
+
+  # Step 5: Deploy API to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-api'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_API_SERVICE}'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/api:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+    waitFor: ['push-api']
+
+  # Step 6: Deploy Dashboard to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-dashboard'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_DASHBOARD_SERVICE}'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/dashboard:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+    waitFor: ['push-dashboard', 'deploy-api']
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/api:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/api:latest'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/dashboard:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/nba-analytics/dashboard:latest'
+
+timeout: '1200s'

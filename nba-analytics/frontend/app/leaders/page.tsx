@@ -99,7 +99,7 @@ export default function LeadersPage() {
   };
 
   const getChartData = () => {
-    const statMap: Record<string, keyof PlayerStats> = {
+    const statMap: Record<string, 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks'> = {
       points: 'points',
       rebounds: 'rebounds',
       assists: 'assists',
@@ -132,7 +132,7 @@ export default function LeadersPage() {
       </Typography>
 
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <FormControl fullWidth>
             <InputLabel>Category</InputLabel>
             <Select value={category} onChange={(e) => setCategory(e.target.value)} label="Category">
@@ -144,7 +144,7 @@ export default function LeadersPage() {
             </Select>
           </FormControl>
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <Box sx={{ px: 2 }}>
             <Typography gutterBottom>Number of Leaders: {limit}</Typography>
             <Slider
