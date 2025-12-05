@@ -1,0 +1,33 @@
+\contentsline {subsection}{\numberline {0.1}Software Components}{5}{subsection.0.1}%
+\contentsline {subsection}{\numberline {0.2}Hardware Requirements}{5}{subsection.0.2}%
+\contentsline {subsection}{\numberline {0.3}Key Files and Structure}{6}{subsection.0.3}%
+\contentsline {subsection}{\numberline {0.4}Architectural Overview}{6}{subsection.0.4}%
+\contentsline {subsection}{\numberline {0.5}Database Schema}{7}{subsection.0.5}%
+\contentsline {subsection}{\numberline {0.6}Data Ingestion Workflow}{9}{subsection.0.6}%
+\contentsline {subsection}{\numberline {0.7}API Request Flow}{9}{subsection.0.7}%
+\contentsline {subsection}{\numberline {0.8}Frontend-Backend Integration}{10}{subsection.0.8}%
+\contentsline {subsection}{\numberline {0.9}Docker Networking}{11}{subsection.0.9}%
+\contentsline {subsection}{\numberline {0.10}Development Debugging Approaches}{11}{subsection.0.10}%
+\contentsline {subsubsection}{\numberline {0.10.1}Backend Debugging}{11}{subsubsection.0.10.1}%
+\contentsline {subsubsection}{\numberline {0.10.2}Frontend Debugging}{12}{subsubsection.0.10.2}%
+\contentsline {subsection}{\numberline {0.11}Testing Mechanisms}{13}{subsection.0.11}%
+\contentsline {subsubsection}{\numberline {0.11.1}Unit Testing}{13}{subsubsection.0.11.1}%
+\contentsline {subsubsection}{\numberline {0.11.2}Integration Testing}{13}{subsubsection.0.11.2}%
+\contentsline {subsubsection}{\numberline {0.11.3}Manual Testing Scenarios}{14}{subsubsection.0.11.3}%
+\contentsline {subsection}{\numberline {0.12}Performance Profiling}{14}{subsection.0.12}%
+\contentsline {subsection}{\numberline {0.13}Current Workload Capacity}{15}{subsection.0.13}%
+\contentsline {subsubsection}{\numberline {0.13.1}Request Throughput}{15}{subsubsection.0.13.1}%
+\contentsline {subsubsection}{\numberline {0.13.2}Data Volume Scaling}{15}{subsubsection.0.13.2}%
+\contentsline {subsection}{\numberline {0.14}Identified Bottlenecks}{16}{subsection.0.14}%
+\contentsline {subsubsection}{\numberline {0.14.1}1. NBA API Rate Limiting}{16}{subsubsection.0.14.1}%
+\contentsline {subsubsection}{\numberline {0.14.2}2. Database Query Complexity}{16}{subsubsection.0.14.2}%
+\contentsline {subsubsection}{\numberline {0.14.3}3. Frontend Asset Loading}{17}{subsubsection.0.14.3}%
+\contentsline {subsubsection}{\numberline {0.14.4}4. Redis Memory Constraints}{17}{subsubsection.0.14.4}%
+\contentsline {subsection}{\numberline {0.15}Scalability Analysis}{17}{subsection.0.15}%
+\contentsline {subsubsection}{\numberline {0.15.1}Horizontal Scaling Opportunities}{17}{subsubsection.0.15.1}%
+\contentsline {subsubsection}{\numberline {0.15.2}Vertical Scaling Limits}{18}{subsubsection.0.15.2}%
+\contentsline {subsection}{\numberline {0.16}System Reliability}{18}{subsection.0.16}%
+\contentsline {subsubsection}{\numberline {0.16.1}Fault Tolerance}{18}{subsubsection.0.16.1}%
+\contentsline {subsubsection}{\numberline {0.16.2}Monitoring and Observability}{18}{subsubsection.0.16.2}%
+\contentsline {subsection}{\numberline {0.17}Technical Challenges}{18}{subsection.0.17}%
+\contentsline {subsection}{\numberline {0.18}Best Practices Adopted}{19}{subsection.0.18}%
