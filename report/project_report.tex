@@ -89,13 +89,17 @@ On the 8 Ball platform, we successfully accomplished the following objectives:
     \item Real-time data updates with configurable auto-refresh (15s intervals)
 \end{itemize}
 
-\subsection*{Infrastructure}
+\subsection*{Infrastructure and Deployment}
 \begin{itemize}
-    \item Dockerized deployment with PostgreSQL, Redis, FastAPI, and Next.js containers
-    \item Docker Compose orchestration with internal networking
-    \item One-command deployment: \texttt{docker-compose up -d}
-    \item Environment-based configuration (development and production modes)
-    \item Support for 50+ concurrent users with horizontal scaling potential
+    \item \textbf{Local Development:} Docker Compose orchestration with PostgreSQL, Redis, FastAPI, and Next.js containers
+    \item \textbf{Cloud Production:} Terraform-managed Google Cloud Platform infrastructure
+    \item \textbf{GCP Services:} Cloud Run (serverless containers), Cloud SQL (PostgreSQL), Memorystore (Redis), Cloud Storage
+    \item \textbf{Networking:} Private VPC with VPC Access Connector for secure Cloud Run to database communication
+    \item \textbf{CI/CD:} Artifact Registry for Docker images, Cloud Build for automated deployments
+    \item \textbf{Automation:} Cloud Scheduler for cron-based data ingestion jobs
+    \item \textbf{Infrastructure as Code:} Complete Terraform modules for reproducible deployments
+    \item \textbf{Scalability:} Auto-scaling Cloud Run instances (0-10 for API, 0-5 for frontend)
+    \item \textbf{Security:} Secret Manager for credentials, IAM service accounts, private networking
 \end{itemize}
 
 \section*{System Components}
@@ -124,8 +128,34 @@ Recharts & 2.10.0 & 2D charting library \\
 Plotly.js & 2.27.0 & 3D visualization library \\
 \midrule
 Docker & 24.0.6 & Container runtime \\
-Docker Compose & 2.23.0 & Multi-container orchestration \\
+Docker Compose & 2.23.0 & Local multi-container orchestration \\
 Pytest & 7.4.3 & Python testing framework \\
+\midrule
+Terraform & 1.6.0+ & Infrastructure as Code (IaC) \\
+Google Cloud SDK & Latest & GCP CLI and management tools \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Google Cloud Platform Services}
+
+\begin{table}[H]
+\centering
+\caption{GCP Services Used in Production Deployment}
+\begin{tabular}{@{}lp{8cm}@{}}
+\toprule
+\textbf{Service} & \textbf{Purpose} \\ \midrule
+Cloud Run & Serverless container deployment for API and frontend \\
+Cloud SQL (PostgreSQL) & Managed PostgreSQL database (db-f1-micro tier) \\
+Memorystore (Redis) & Managed Redis cache (1GB BASIC tier) \\
+Cloud Storage & Object storage for ML models and artifacts \\
+Artifact Registry & Docker image repository \\
+VPC & Private networking for secure service communication \\
+VPC Access Connector & Connects Cloud Run to VPC resources \\
+Secret Manager & Secure storage for database credentials \\
+Cloud Scheduler & Cron jobs for automated data ingestion \\
+Cloud Build & CI/CD pipeline for container builds \\
+IAM & Service accounts and access control \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -162,12 +192,18 @@ nba-predictive-analytics/
 |   |-- services/
 |   |   |-- data_ingestion.py    (NBA API ETL, 630 lines)
 |   |   |-- cache.py             (Redis operations, 228 lines)
-|   |-- scripts/
-|   |   |-- run_ingestion.py     (Manual ingestion trigger)
-|   |-- dashboard/
-|   |   |-- app.py               (Legacy Streamlit UI, 557 lines)
-|   |-- config.py                (Environment config, 84 lines)
-|   |-- docker-compose.yml       (Service orchestration)
+|   |-- terraform/
+|   |   |-- main.tf              (Root Terraform config)
+|   |   |-- variables.tf         (Input variables)
+|   |   |-- outputs.tf           (Output values)
+|   |   |-- modules/
+|   |   |   |-- networking/      (VPC, subnets, connector)
+|   |   |   |-- database/        (Cloud SQL PostgreSQL)
+|   |   |   |-- cache/           (Memorystore Redis)
+|   |   |   |-- cloud_run/       (Serverless containers)
+|   |   |   |-- scheduler/       (Cron jobs)
+|   |   |   |-- storage/         (Cloud Storage buckets)
+|   |-- docker-compose.yml       (Local orchestration)
 |   |-- requirements.txt         (Python dependencies)
 |-- frontend/
 |   |-- app/
