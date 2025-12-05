@@ -30,7 +30,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea } from 'recharts';
 import { api } from '@/lib/api';
 import type { LiveGame, Shot, Play } from '@/lib/types';
 import ShotChart3D from '@/components/ShotChart3D';
@@ -176,6 +176,101 @@ export default function LiveGamePage() {
   };
 
   const quarterlyScores = getQuarterlyScores();
+
+  // Custom component to render basketball court overlay on heatmap
+  const CourtOverlay = (props: any) => {
+    const { xAxisMap, yAxisMap } = props;
+    if (!xAxisMap || !yAxisMap) return null;
+
+    const xAxis = xAxisMap[0];
+    const yAxis = yAxisMap[0];
+    if (!xAxis || !yAxis) return null;
+
+    const xScale = xAxis.scale;
+    const yScale = yAxis.scale;
+
+    // Helper to convert court coordinates to SVG coordinates
+    const toX = (x: number) => xScale(x);
+    const toY = (y: number) => yScale(y);
+
+    // Generate 3-point arc path
+    const generate3PtArc = () => {
+      const radius = 237.5;
+      const startAngle = Math.acos(220 / radius);
+      const endAngle = Math.PI - startAngle;
+      const points = Array.from({ length: 50 }, (_, i) => {
+        const angle = startAngle + (i / 49) * (endAngle - startAngle);
+        return [radius * Math.cos(angle), radius * Math.sin(angle)];
+      });
+      return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p[0])} ${toY(p[1])}`).join(' ');
+    };
+
+    // Generate free throw circle path
+    const generateFTCircle = () => {
+      const cx = 0;
+      const cy = 140;
+      const r = 60;
+      const points = Array.from({ length: 50 }, (_, i) => {
+        const angle = (i / 49) * 2 * Math.PI;
+        return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
+      });
+      return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p[0])} ${toY(p[1])}`).join(' ') + ' Z';
+    };
+
+    // Generate rim circle path
+    const generateRim = () => {
+      const cx = 0;
+      const cy = 0;
+      const r = 7.5;
+      const points = Array.from({ length: 30 }, (_, i) => {
+        const angle = (i / 29) * 2 * Math.PI;
+        return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
+      });
+      return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(p[0])} ${toY(p[1])}`).join(' ') + ' Z';
+    };
+
+    return (
+      <g>
+        {/* Court outline */}
+        <rect
+          x={toX(-250)}
+          y={toY(420)}
+          width={toX(250) - toX(-250)}
+          height={toY(-50) - toY(420)}
+          fill="none"
+          stroke="#1a365d"
+          strokeWidth={2}
+        />
+
+        {/* Paint area */}
+        <rect
+          x={toX(-80)}
+          y={toY(140)}
+          width={toX(80) - toX(-80)}
+          height={toY(-50) - toY(140)}
+          fill="none"
+          stroke="#c53030"
+          strokeWidth={2}
+        />
+
+        {/* Free throw circle */}
+        <path d={generateFTCircle()} fill="none" stroke="#c53030" strokeWidth={2} />
+
+        {/* 3-point arc */}
+        <path d={generate3PtArc()} fill="none" stroke="#1a365d" strokeWidth={2} />
+
+        {/* 3-point corner lines */}
+        <line x1={toX(-220)} y1={toY(-50)} x2={toX(-220)} y2={toY(90)} stroke="#1a365d" strokeWidth={2} />
+        <line x1={toX(220)} y1={toY(-50)} x2={toX(220)} y2={toY(90)} stroke="#1a365d" strokeWidth={2} />
+
+        {/* Rim */}
+        <path d={generateRim()} fill="none" stroke="#dd6b20" strokeWidth={3} />
+
+        {/* Backboard */}
+        <line x1={toX(-30)} y1={toY(-7.5)} x2={toX(30)} y2={toY(-7.5)} stroke="#fff" strokeWidth={3} />
+      </g>
+    );
+  };
 
   return (
     <Box>
@@ -516,17 +611,26 @@ export default function LiveGamePage() {
               </Typography>
               <ResponsiveContainer width="100%" height={600}>
                 <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <defs>
+                    <rect id="courtBg" x={0} y={0} width="100%" height="100%" fill="#e8dcc4" />
+                  </defs>
                   <XAxis type="number" dataKey="x" domain={[-250, 250]} hide />
                   <YAxis type="number" dataKey="y" domain={[-50, 420]} hide />
                   <ZAxis type="number" range={[100, 400]} />
                   <Tooltip
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
+                        const shot = payload[0].payload as Shot;
                         return (
                           <Paper sx={{ p: 1 }}>
-                            <Typography variant="body2">
-                              Shots in this area: {payload.length}
+                            <Typography variant="body2" fontWeight="bold">
+                              {shot.player_name}
+                            </Typography>
+                            <Typography variant="caption" display="block">
+                              {shot.made ? 'MADE' : 'MISSED'} - {shot.shot_type}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {shot.distance}ft
                             </Typography>
                           </Paper>
                         );
@@ -534,7 +638,26 @@ export default function LiveGamePage() {
                       return null;
                     }}
                   />
-                  <Scatter data={filteredShots} fill="#ff9800" fillOpacity={0.6} />
+                  <CourtOverlay />
+                  <Scatter
+                    data={filteredShots}
+                    fill="#ff9800"
+                    fillOpacity={0.6}
+                    shape={(props: any) => {
+                      const { cx, cy, fill, payload } = props;
+                      return (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={6}
+                          fill={payload.made ? '#38a169' : '#e53e3e'}
+                          fillOpacity={0.7}
+                          stroke={payload.made ? '#276749' : '#c53030'}
+                          strokeWidth={1.5}
+                        />
+                      );
+                    }}
+                  />
                 </ScatterChart>
               </ResponsiveContainer>
             </Paper>
