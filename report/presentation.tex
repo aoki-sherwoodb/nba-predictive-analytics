@@ -1,11 +1,7 @@
-% Beamer Presentation for 8 Ball NBA Analytics Platform
-% CSCI 5253 Datacenter Scale Computing - Final Project
-% ~5 minute presentation with 3+ minute live demo
-
 \documentclass[aspectratio=169]{beamer}
 
 % Theme and Color
-\usetheme{Madrid}
+\usetheme{metropolis}
 \usecolortheme{seahorse}
 
 % Packages
@@ -13,6 +9,9 @@
 \usepackage{booktabs}
 \usepackage{hyperref}
 \usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
 
 % Title Information
 \title{\textbf{8 Ball}}
@@ -39,40 +38,24 @@
 % =============================================================================
 % PROBLEM STATEMENT
 % =============================================================================
-\begin{frame}{What is 8 Ball?}
+\begin{frame}{What is \textbf{8 Ball}?}
 
-\begin{columns}[T]
-\begin{column}{0.5\textwidth}
-\textbf{Problem:}
 \begin{itemize}
-    \item NBA fans want real-time stats and analytics
-    \item Existing platforms lack interactive visualizations
-    \item Need scalable cloud infrastructure
+    \item Follow your favorite teams and players: real-time NBA game stats and analytics
+    \item See who's on top: track standings and leaderboards over the course of the season
+    \item Scale to hundreds of concurrent users
 \end{itemize}
 
-\vspace{1em}
-\textbf{Solution:}
-\begin{itemize}
-    \item Real-time data ingestion from NBA API
-    \item Interactive 3D shot charts and heatmaps
-    \item Cloud-native architecture on GCP
-\end{itemize}
-\end{column}
+\end{frame}
 
-\begin{column}{0.5\textwidth}
-\textbf{Tech Stack:}
+\begin{frame}{Tech Stack}
 \begin{itemize}
     \item \textbf{Backend:} Python, FastAPI, PostgreSQL, Redis
     \item \textbf{Frontend:} Next.js, TypeScript, Material-UI
     \item \textbf{Cloud:} GCP Cloud Run, Cloud SQL, Memorystore
     \item \textbf{IaC:} Terraform, Docker
 \end{itemize}
-
-\vspace{1em}
-\textbf{GitHub:} \href{https://github.com/cu-csci-4253-datacenter-fall-2025/final-project-aoki-sherwoodb}{\textcolor{blue}{final-project-aoki-sherwoodb}}
-\end{column}
-\end{columns}
-
+    
 \end{frame}
 
 % =============================================================================
@@ -82,8 +65,50 @@
 
 \begin{figure}
 \centering
-\includegraphics[width=0.85\textwidth]{sys_diagram_nba.png}
-\caption{Datacenter-scale architecture with microservices, caching, and auto-scaling}
+\begin{tikzpicture}[
+    node distance=1.2cm,
+    component/.style={rectangle, draw, rounded corners, minimum width=2.4cm, minimum height=0.9cm, align=center, fill=blue!12, font=\small},
+    database/.style={cylinder, draw, shape border rotate=90, aspect=0.25, minimum height=1cm, minimum width=2cm, fill=green!15, font=\small},
+    external/.style={rectangle, draw, dashed, minimum width=2.4cm, minimum height=0.9cm, align=center, fill=gray!10, font=\small},
+    arrow/.style={-{Stealth[length=2mm]}, thick},
+    biarrow/.style={{Stealth[length=2mm]}-{Stealth[length=2mm]}, thick}
+]
+
+% Row 1: Data ingestion
+\node[external] (nba) {NBA Stats API};
+\node[component, right=2.5cm of nba] (ingestion) {Ingestion Service};
+
+% Row 2: Storage layer
+\node[database, below=1.5cm of nba, xshift=1.25cm] (postgres) {PostgreSQL};
+\node[database, right=2.5cm of postgres] (redis) {Redis};
+
+% Row 3: API and Frontend
+\node[component, below=1.5cm of postgres, xshift=1.25cm] (api) {FastAPI Backend};
+\node[component, right=2.5cm of api] (frontend) {Next.js Frontend};
+
+% Users
+\node[external, below=1.2cm of frontend] (users) {Users};
+
+% Arrows - Ingestion flow
+\draw[arrow] (nba) -- (ingestion);
+\draw[arrow] (ingestion.south) -- ++(0,-0.4) -| (postgres.north);
+\draw[arrow] (ingestion.south) -- ++(0,-0.4) -| (redis.north);
+
+% Arrows - API reads from storage
+\draw[biarrow] (postgres.south) -- (api.north west);
+\draw[biarrow] (redis.south) -- (frontend.north);
+
+% Arrows - Frontend and users
+\draw[biarrow] (api) -- (frontend);
+\draw[arrow] (frontend) -- (users);
+
+% Layer labels
+\node[left=0.3cm of nba, font=\scriptsize\itshape, align=right] {Data\\Source};
+\node[left=0.3cm of postgres, font=\scriptsize\itshape, align=right] {Storage\\Layer};
+\node[left=0.3cm of api, font=\scriptsize\itshape, align=right] {API\\Layer};
+\node[left=0.3cm of users, font=\scriptsize\itshape, align=right] {Users};
+
+\end{tikzpicture}
 \end{figure}
 
 \begin{itemize}
@@ -98,13 +123,13 @@
 % =============================================================================
 % KEY FEATURES
 % =============================================================================
-\begin{frame}{Key Features Implemented}
+\begin{frame}{Key Features}
 
 \begin{columns}[T]
 \begin{column}{0.5\textwidth}
 \textbf{Data \& Analytics:}
 \begin{itemize}
-    \item 5 seasons of historical data (2021-2026)
+    \item 2 seasons of historical data (2024-2026)
     \item Live game updates every 15-30 seconds
     \item Statistical leaders (PTS, REB, AST, STL, BLK)
     \item Conference standings with streaks
@@ -124,42 +149,23 @@
 \end{column}
 \end{columns}
 
-\vspace{1em}
-\begin{center}
-\textbf{\large Live Demo Time!}
-\end{center}
-
 \end{frame}
 
 % =============================================================================
 % PERFORMANCE METRICS
 % =============================================================================
-\begin{frame}{Performance \& Scalability}
+\begin{frame}{Scalability \& Debugging}
 
 \begin{columns}[T]
 \begin{column}{0.55\textwidth}
-\textbf{API Performance:}
+\textbf{Debugging and testing:}
 
-\vspace{0.5em}
-\begin{table}
-\scriptsize
-\begin{tabular}{@{}lcc@{}}
-\toprule
-\textbf{Endpoint} & \textbf{Cache Hit} & \textbf{Cache Miss} \\ \midrule
-\texttt{/standings} & 45ms & 180ms \\
-\texttt{/leaders} & 70ms & 250ms \\
-\texttt{/games/live} & 50ms & 200ms \\
-\texttt{/shots} & 80ms & 350ms \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\vspace{0.5em}
-\textbf{Database Growth:}
 \begin{itemize}
-    \item Current: 1.2GB (2 seasons)
-    \item Projection: +600MB per season
-    \item Player stats: 1M rows
+    \item FastAPI autodocs
+    \item Browser devtools console; tested on multiple browsers and platforms
+    \item \texttt{pytest} unit testing framework
+    \item Manual end-to-end testing for a week's worth of games
+    \item pydantic type checking for debugging
 \end{itemize}
 \end{column}
 
@@ -184,125 +190,51 @@
 
 \end{frame}
 
+\begin{frame}[standout]
+    Demo
+\end{frame}
+
 % =============================================================================
 % LESSONS LEARNED
 % =============================================================================
-\begin{frame}{Lessons Learned \& Future Work}
+% \begin{frame}{Lessons Learned \& Future Work}
 
-\begin{columns}[T]
-\begin{column}{0.5\textwidth}
-\textbf{Technical Challenges:}
-\begin{itemize}
-    \item NBA API inconsistencies (null fields in live data)
-    \item Time zone conversions (UTC $\rightarrow$ Eastern)
-    \item Redis schema migrations during development
-    \item CORS configuration for frontend-backend
-\end{itemize}
+% \begin{columns}[T]
+% \begin{column}{0.5\textwidth}
+% \textbf{Technical Challenges:}
+% \begin{itemize}
+%     \item NBA API inconsistencies (null fields in live data)
+%     \item Time zone conversions (UTC $\rightarrow$ Eastern)
+%     \item Redis schema migrations during development
+%     \item CORS configuration for frontend-backend
+% \end{itemize}
 
-\vspace{0.5em}
-\textbf{Best Practices:}
-\begin{itemize}
-    \item Pydantic type safety caught 15+ bugs
-    \item Docker Compose for one-command dev setup
-    \item Terraform for reproducible infrastructure
-\end{itemize}
-\end{column}
+% \vspace{0.5em}
+% \textbf{Best Practices:}
+% \begin{itemize}
+%     \item Pydantic type safety caught 15+ bugs
+%     \item Docker Compose for one-command dev setup
+%     \item Terraform for reproducible infrastructure
+% \end{itemize}
+% \end{column}
 
-\begin{column}{0.5\textwidth}
-\textbf{Future Enhancements:}
-\begin{enumerate}
-    \item \textbf{ML Predictions:} LSTM models for game outcomes
-    \item \textbf{Horizontal Scaling:} Multi-instance API + read replicas
-    \item \textbf{Monitoring:} Prometheus + Grafana dashboards
-    \item \textbf{Real-time Alerts:} WebSocket push for live scores
-    \item \textbf{Player Comparisons:} Side-by-side stat analysis
-\end{enumerate}
-\end{column}
-\end{columns}
+% \begin{column}{0.5\textwidth}
+% \textbf{Future Enhancements:}
+% \begin{enumerate}
+%     \item \textbf{ML Predictions:} LSTM models for game outcomes
+%     \item \textbf{Horizontal Scaling:} Multi-instance API + read replicas
+%     \item \textbf{Monitoring:} Prometheus + Grafana dashboards
+%     \item \textbf{Real-time Alerts:} WebSocket push for live scores
+%     \item \textbf{Player Comparisons:} Side-by-side stat analysis
+% \end{enumerate}
+% \end{column}
+% \end{columns}
 
-\vspace{1em}
-\begin{center}
-\Large{\textbf{Thank You! Questions?}}
-\end{center}
+% \vspace{1em}
+% \begin{center}
+% \Large{\textbf{Thank You! Questions?}}
+% \end{center}
 
-\end{frame}
-
-% =============================================================================
-% BACKUP SLIDE: TERRAFORM MODULES
-% =============================================================================
-\begin{frame}[noframenumbering]{Backup: Infrastructure as Code}
-
-\textbf{Terraform Modules (6 total):}
-
-\begin{columns}[T]
-\begin{column}{0.5\textwidth}
-\begin{itemize}
-    \item \texttt{networking/} - VPC, subnets, connector
-    \item \texttt{database/} - Cloud SQL PostgreSQL
-    \item \texttt{cache/} - Memorystore Redis
-\end{itemize}
-\end{column}
-
-\begin{column}{0.5\textwidth}
-\begin{itemize}
-    \item \texttt{cloud\_run/} - API \& frontend services
-    \item \texttt{scheduler/} - Cron jobs for ingestion
-    \item \texttt{storage/} - Cloud Storage buckets
-\end{itemize}
-\end{column}
-\end{columns}
-
-\vspace{1em}
-\textbf{GCP Services Enabled:}
-\begin{itemize}
-    \item Cloud Run, Cloud SQL, Memorystore, Cloud Storage, Artifact Registry
-    \item VPC Access, Secret Manager, Cloud Scheduler, Cloud Build, IAM
-\end{itemize}
-
-\vspace{0.5em}
-\textbf{One-Command Deployment:}
-\begin{itemize}
-    \item \texttt{terraform init \&\& terraform apply}
-    \item Outputs: API URL, Frontend URL, Database connection string
-\end{itemize}
-
-\end{frame}
-
-% =============================================================================
-% BACKUP SLIDE: DATABASE SCHEMA
-% =============================================================================
-\begin{frame}[noframenumbering]{Backup: Database Schema}
-
-\textbf{Normalized PostgreSQL Schema (6 tables):}
-
-\begin{columns}[T]
-\begin{column}{0.5\textwidth}
-\textbf{Core Entities:}
-\begin{itemize}
-    \item \texttt{teams} - NBA franchises (30 teams)
-    \item \texttt{players} - Active roster (450+ players)
-    \item \texttt{games} - Game metadata (1,230 per season)
-\end{itemize}
-\end{column}
-
-\begin{column}{0.5\textwidth}
-\textbf{Statistics:}
-\begin{itemize}
-    \item \texttt{player\_game\_stats} - Box scores (1M rows)
-    \item \texttt{team\_standings} - Daily standings snapshots
-    \item \texttt{ingestion\_log} - Data pipeline audit trail
-\end{itemize}
-\end{column}
-\end{columns}
-
-\vspace{1em}
-\textbf{Indexes:}
-\begin{itemize}
-    \item \texttt{idx\_games\_date} - Fast date range queries
-    \item \texttt{idx\_player\_stats\_game} - Efficient box score lookups
-    \item \texttt{idx\_standings\_team\_date} - Historical standings retrieval
-\end{itemize}
-
-\end{frame}
+% \end{frame}
 
 \end{document}
