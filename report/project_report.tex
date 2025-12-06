@@ -13,6 +13,7 @@
 \usepackage{booktabs}
 \usepackage{caption}
 \usepackage{float}
+\usepackage{parskip}
 
 % Configure hyperref
 \hypersetup{
@@ -37,7 +38,7 @@
 \author{
     Ben Aoki-Sherwood\\
     Arjun Ashok Rao\\
-    \url{https://github.com/cu-csci-4253-datacenter-fall-2025/final-project-aoki-sherwoodb}
+    \href{https://github.com/cu-csci-4253-datacenter-fall-2025/final-project-aoki-sherwoodb}{GitHub}
 }
 
 \date{\today}
@@ -47,17 +48,17 @@
 \maketitle
 
 \begin{abstract}
-This report presents the design, implementation, and evaluation of \textbf{8 Ball}, a real-time NBA analytics platform built for datacenter-scale deployment. The system ingests live NBA game data, stores it in a normalized PostgreSQL database, implements Redis caching for performance optimization, and serves interactive visualizations through a modern Next.js web application. The platform handles concurrent user requests, processes live game updates, and provides statistical analysis including 3D shot charts, play-by-play tracking, and predictive analytics for NBA games.
+This report presents the design, implementation, and evaluation of \textbf{8 Ball}, a real-time NBA analytics platform built for datacenter-scale deployment. The system ingests live NBA game data, stores it in a normalized PostgreSQL database, implements Redis caching for performance optimization, and serves interactive visualizations through a Next.js web application. The platform handles concurrent user requests, processes live game updates, and provides statistical analysis including 3D shot charts, play-by-play tracking, and statistical leaderboards for NBA games and players.
 \end{abstract}
 
 \tableofcontents
 \newpage
 
-\section*{Project Goals}
+\section{Project Goals}
 
 On the 8 Ball platform, we successfully accomplished the following objectives:
 
-\subsection*{Data Ingestion and Storage}
+\subsection{Data Ingestion and Storage}
 \begin{itemize}
     \item Ingest live NBA game data from the NBA Stats API for the current season (2025-26) and the previous 4 seasons for predictive modeling
     \item Design a normalized PostgreSQL database schema to store teams, players, games, player statistics, and team standings
@@ -67,7 +68,7 @@ On the 8 Ball platform, we successfully accomplished the following objectives:
     \item Achieve 85\%+ cache hit rate and sub-150ms average response times
 \end{itemize}
 
-\subsection*{Statistical Analytics}
+\subsection{Statistical Analytics}
 \begin{itemize}
     \item \textbf{Statistical Leaders:} Display top performers by category (points, rebounds, assists, steals, blocks) with filtering by top N players
     \item \textbf{Live Game Shot Charts:} 3D interactive shot visualization with parabolic arcs for made shots, court overlay, and player filtering
@@ -78,7 +79,7 @@ On the 8 Ball platform, we successfully accomplished the following objectives:
     \item \textbf{Win Predictions:} (Placeholder for future ML integration - basic game outcome display currently implemented)
 \end{itemize}
 
-\subsection*{Dashboard Features}
+\subsection{Dashboard Features}
 \begin{itemize}
     \item Modern Next.js 15 application with TypeScript and Material-UI dark theme
     \item Horizontal navigation bar with "8 Ball" branding and NBA logo
@@ -89,7 +90,7 @@ On the 8 Ball platform, we successfully accomplished the following objectives:
     \item Real-time data updates with configurable auto-refresh (15s intervals)
 \end{itemize}
 
-\subsection*{Infrastructure and Deployment}
+\subsection{Infrastructure and Deployment}
 \begin{itemize}
     \item \textbf{Local Development:} Docker Compose orchestration with PostgreSQL, Redis, FastAPI, and Next.js containers
     \item \textbf{Cloud Production:} Terraform-managed Google Cloud Platform infrastructure
@@ -102,37 +103,37 @@ On the 8 Ball platform, we successfully accomplished the following objectives:
     \item \textbf{Security:} Secret Manager for credentials, IAM service accounts, private networking
 \end{itemize}
 
-\section*{System Components}
+\section{System Components}
 
 \subsection{Software Components}
 
 \begin{table}[H]
 \centering
-\caption{Software Stack and Versions}
-\begin{tabular}{@{}llp{6cm}@{}}
+\caption{Software Stack: Pros and Cons}
+\begin{tabular}{@{}lp{5.5cm}p{5.5cm}@{}}
 \toprule
-\textbf{Component} & \textbf{Version} & \textbf{Purpose} \\ \midrule
-Python & 3.11+ & Backend runtime, data ingestion \\
-FastAPI & 0.104.1 & REST API framework \\
-PostgreSQL & 15.3 & Primary relational database \\
-Redis & 7.2 & In-memory cache layer \\
-SQLAlchemy & 2.0.23 & ORM and database abstraction \\
-Pydantic & 2.5.0 & Data validation and serialization \\
-nba\_api & 1.4.1 & NBA Stats API client library \\
+\textbf{Component} & \textbf{Pros} & \textbf{Cons} \\ \midrule
+Python & Expertise, data science libraries & Slower than compiled languages \\
+FastAPI & Fast async support and auto-generated docs & Smaller ecosystem than Flask/Django \\
+PostgreSQL & ACID compliance, robust SQL features, JSON support & Requires tuning at scale \\
+Redis & Fast in-memory operations, simple key-value API & Memory-bound storage, data loss risk without persistence \\
+SQLAlchemy & Python-native db queries & Can generate inefficient queries \\
+Pydantic & Data validation with FastAPI integration & Adds overhead \\
+nba\_api & Comprehensive NBA stats access, Pythonic interface & Strict rate limiting, no official support \\
 \midrule
-Node.js & 20.x & Frontend runtime \\
-Next.js & 15.0.0 & React framework with SSR \\
-TypeScript & 5.3.0 & Type-safe JavaScript \\
-Material-UI & 5.14.0 & React component library \\
-Recharts & 2.10.0 & 2D charting library \\
-Plotly.js & 2.27.0 & 3D visualization library \\
+Node.js & JavaScript everywhere with async I/O & Single-threaded CPU bottleneck \\
+Next.js & File-based routing and image optimization & Opinionated structure \\
+TypeScript & Type safety & Compilation step required \\
+Material-UI & Professional appearance & Large bundle size (300KB+)\\
+Recharts & Composable charts and responsive by default & Limited 3D capabilities \\
+Plotly.js & Interactive 3D charts, export to PNG/SVG & Default interactive buttons can look unprofessional \\
 \midrule
-Docker & 24.0.6 & Container runtime \\
-Docker Compose & 2.23.0 & Local multi-container orchestration \\
-Pytest & 7.4.3 & Python testing framework \\
+Docker & Consistent environments, application isolation, portability & Resource overhead \\
+Docker Compose & Simple multi-container setup, declarative YAML config & Limited orchestration \\
+Pytest & Easy pythonic testing & Not built-in library \\
 \midrule
-Terraform & 1.6.0+ & Infrastructure as Code (IaC) \\
-Google Cloud SDK & Latest & GCP CLI and management tools \\
+Terraform & Multi-cloud support, state management, plan/apply safety & State file complexity, learning curve for HCL syntax \\
+Google Cloud SDK & Comprehensive CLI, scriptable, local emulation tools & Verbose command syntax \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -180,370 +181,44 @@ IAM & Service accounts and access control \\
     \end{itemize}
 \end{itemize}
 
-\subsection{Key Files and Structure}
 
-\begin{lstlisting}[language=bash, caption=Project Directory Structure]
-nba-predictive-analytics/
-|-- nba-analytics/
-|   |-- api/
-|   |   |-- main.py              (FastAPI endpoints, 549 lines)
-|   |-- models/
-|   |   |-- database_models.py   (SQLAlchemy ORM, 233 lines)
-|   |-- services/
-|   |   |-- data_ingestion.py    (NBA API ETL, 630 lines)
-|   |   |-- cache.py             (Redis operations, 228 lines)
-|   |-- terraform/
-|   |   |-- main.tf              (Root Terraform config)
-|   |   |-- variables.tf         (Input variables)
-|   |   |-- outputs.tf           (Output values)
-|   |   |-- modules/
-|   |   |   |-- networking/      (VPC, subnets, connector)
-|   |   |   |-- database/        (Cloud SQL PostgreSQL)
-|   |   |   |-- cache/           (Memorystore Redis)
-|   |   |   |-- cloud_run/       (Serverless containers)
-|   |   |   |-- scheduler/       (Cron jobs)
-|   |   |   |-- storage/         (Cloud Storage buckets)
-|   |-- docker-compose.yml       (Local orchestration)
-|   |-- requirements.txt         (Python dependencies)
-|-- frontend/
-|   |-- app/
-|   |   |-- live-game/page.tsx   (Live game visualization)
-|   |   |-- standings/page.tsx   (Conference standings)
-|   |   |-- leaders/page.tsx     (Statistical leaders)
-|   |-- components/
-|   |   |-- Navigation.tsx       (App bar with tabs)
-|   |   |-- ShotChart3D.tsx      (Plotly 3D court)
-|   |-- lib/
-|   |   |-- api.ts               (API client service)
-|   |   |-- types.ts             (TypeScript interfaces)
-|   |-- package.json             (Node dependencies)
-|-- report/
-    |-- project_report.tex       (This document)
-\end{lstlisting}
+\input{sys_arch}
+\input{componenet_interactions}
 
-\section*{System Architecture}
+\section{Debugging and Testing}
 
-\subsection{Architectural Overview}
+During development, we tester our backend APIs using curl and the browser developer tools console, and the automatic API documentation generated by FastAPI at \texttt{http://localhost:8000/docs}. 
+To debug the data ingestion, we added logging to the ingestion service and added an incremental ingestion mode to avoid the slow process of re-ingestion a full season's worth of historical data (slow because of the external API rate limit). 
+To debug the Redis cache, we used the redis commandline tool to manually inspect cached data and clear stale data as we updated the schema. We also monitored cache miss rates in our API logs.
 
-The 8 Ball platform follows a four-tier architecture: Data Source $\rightarrow$ Ingestion/Storage $\rightarrow$ API Layer $\rightarrow$ Presentation Layer. Figure~\ref{fig:architecture} illustrates the complete data flow and component interactions.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{sys_diagram_nba.png}
-\caption{System Architecture and Data Flow}
-\label{fig:architecture}
-\end{figure}
-
-\subsection{Database Schema}
-
-The PostgreSQL database uses a normalized schema with 6 primary tables:
+We implemented unit tests for our backend components using \texttt{pytest}. 
+These tests covered our API endpoints, our database model, data ingestion, and caching.
+For integration testing, we verified that the live game auto-refresh worked over several days of games, and tested our dashboard in Chrome, Safari, and Firefox on macOS and iOS. 
+We also performed the manual end-to-end tests shown in Table~\ref{tab:manual_tests} for each day of the week of December 1st, 2025.
 
 \begin{table}[H]
 \centering
-\caption{Database Schema Overview}
-\small
-\begin{tabular}{@{}lp{8cm}@{}}
-\toprule
-\textbf{Table} & \textbf{Key Fields and Purpose} \\ \midrule
-\texttt{teams} & \texttt{id, nba\_id, name, abbreviation, city, conference} \\
-& Stores NBA team metadata (30 teams) \\
-\midrule
-\texttt{players} & \texttt{id, nba\_id, first\_name, last\_name, position, team\_id} \\
-& Player roster information (530+ active players) \\
-\midrule
-\texttt{games} & \texttt{id, nba\_id, home\_team\_id, away\_team\_id, game\_date,} \\
-& \texttt{home\_score, away\_score, season, status} \\
-& Game results and scheduling (1,230+ games) \\
-\midrule
-\texttt{player\_game\_stats} & \texttt{id, player\_id, game\_id, points, rebounds, assists, minutes,} \\
-& \texttt{field\_goals\_made, three\_pointers\_made, free\_throws\_made} \\
-& Individual performance per game (15,000+ records) \\
-\midrule
-\texttt{team\_standings} & \texttt{id, team\_id, season, wins, losses, win\_percentage,} \\
-& \texttt{conference\_rank, games\_back, current\_streak, last\_10} \\
-& Current season standings (60 records: 30 teams $\times$ 2 seasons) \\
-\midrule
-\texttt{ingestion\_logs} & \texttt{id, ingestion\_type, status, start\_time, end\_time,} \\
-& \texttt{records\_processed, error\_message} \\
-& ETL job tracking and error logging \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\noindent\textbf{Key Relationships:}
-\begin{itemize}
-    \item \texttt{players.team\_id} $\rightarrow$ \texttt{teams.id} (many-to-one)
-    \item \texttt{games.home\_team\_id, away\_team\_id} $\rightarrow$ \texttt{teams.id}
-    \item \texttt{player\_game\_stats.player\_id} $\rightarrow$ \texttt{players.id}
-    \item \texttt{player\_game\_stats.game\_id} $\rightarrow$ \texttt{games.id}
-    \item \texttt{team\_standings.team\_id} $\rightarrow$ \texttt{teams.id}
-\end{itemize}
-
-\section*{Component Interactions}
-
-\subsection{Data Ingestion Workflow}
-
-\begin{enumerate}
-    \item \textbf{Initialization:} Ingestion service connects to PostgreSQL and Redis
-    \item \textbf{API Requests:} Fetch data from NBA Stats API with exponential backoff retry logic
-    \item \textbf{Rate Limiting:} Sleep 0.6 seconds between requests to avoid 429 errors
-    \item \textbf{Data Transformation:} Parse JSON responses, normalize fields, handle missing values
-    \item \textbf{Upsert to PostgreSQL:} Use \texttt{INSERT...ON CONFLICT DO UPDATE} to avoid duplicates
-    \item \textbf{Cache Population:} Write frequently accessed data to Redis with appropriate TTLs
-    \item \textbf{Logging:} Record ingestion metrics in \texttt{ingestion\_logs} table
-\end{enumerate}
-
-\noindent\textbf{Example Ingestion Code Pattern:}
-\begin{lstlisting}[language=Python, caption=Upsert Logic in data\_ingestion.py]
-# Upsert team standings
-stmt = insert(TeamStanding).values(
-    team_id=team.id,
-    season=season,
-    wins=record['wins'],
-    losses=record['losses'],
-    # ... other fields
-).on_conflict_do_update(
-    index_elements=['team_id', 'season'],
-    set_={
-        'wins': record['wins'],
-        'losses': record['losses'],
-        # ... update fields
-    }
-)
-session.execute(stmt)
-\end{lstlisting}
-
-\subsection{API Request Flow}
-
-\begin{enumerate}
-    \item \textbf{Client Request:} Frontend sends HTTP GET to FastAPI endpoint (e.g., \texttt{/api/standings})
-    \item \textbf{Cache Check:} API checks Redis for cached result using key prefix + parameters
-    \item \textbf{Cache Hit:} If found and not expired, deserialize JSON and return (typical: 50-80ms)
-    \item \textbf{Cache Miss:} Query PostgreSQL using SQLAlchemy ORM
-    \item \textbf{Database Query:} Execute SQL with joins, filters, and aggregations (typical: 100-200ms)
-    \item \textbf{Response Validation:} Map ORM objects to Pydantic models for type safety
-    \item \textbf{Cache Write:} Store serialized result in Redis with TTL
-    \item \textbf{HTTP Response:} Return JSON to client with CORS headers
-\end{enumerate}
-
-\noindent\textbf{Cache Key Strategy:}
-\begin{lstlisting}[caption=Redis Key Patterns]
-standings:2025-26              # Current season standings
-team:29:games:recent:7         # Last 7 games for team ID 29
-player:2544:stats              # Season stats for player ID 2544
-game:0022500123:shots          # Shot chart for specific game
-leaders:points:10              # Top 10 points leaders
-\end{lstlisting}
-
-\subsection{Frontend-Backend Integration}
-
-The Next.js frontend communicates with the FastAPI backend through a centralized API client (\texttt{lib/api.ts}):
-
-\begin{lstlisting}[language=Java, caption=API Client Pattern]
-class ApiClient {
-  private baseUrl = process.env.NEXT_PUBLIC_API_URL;
-
-  async getStandings(): Promise<StandingsResponse> {
-    const response = await fetch(`${this.baseUrl}/api/standings`);
-    if (!response.ok) throw new Error('Failed to fetch standings');
-    return response.json();
-  }
-
-  async getLiveGames(): Promise<LiveGame[]> {
-    return this.fetch('/api/games/live');
-  }
-}
-
-export const api = new ApiClient();
-\end{lstlisting}
-
-\noindent\textbf{Frontend Pages and Data Sources:}
-\begin{itemize}
-    \item \texttt{/standings} $\rightarrow$ \texttt{GET /api/standings} (cached 5min)
-    \item \texttt{/leaders} $\rightarrow$ \texttt{GET /api/leaders?category=points\&limit=10} (cached 1hr)
-    \item \texttt{/live-game} $\rightarrow$ \texttt{GET /api/games/live}, \texttt{/api/games/\{id\}/shots} (cached 30s, auto-refresh)
-    \item \texttt{/team-analysis} $\rightarrow$ \texttt{GET /api/games/recent?team\_id=X\&days=365}
-\end{itemize}
-
-\subsection{Docker Networking}
-
-All services run in a Docker Compose network with internal DNS resolution:
-
-\begin{lstlisting}[caption=docker-compose.yml Network Configuration]
-services:
-  postgres:
-    container_name: nba_postgres
-    networks:
-      - nba_network
-    ports:
-      - "5432:5432"
-
-  redis:
-    container_name: nba_redis
-    networks:
-      - nba_network
-    ports:
-      - "6379:6379"
-
-  api:
-    container_name: nba_api
-    environment:
-      - DB_HOST=postgres    # Internal DNS name
-      - REDIS_HOST=redis
-    networks:
-      - nba_network
-    ports:
-      - "8000:8000"
-
-networks:
-  nba_network:
-    driver: bridge
-\end{lstlisting}
-
-\section*{Debugging and Testing Methodology}
-
-\subsection{Development Debugging Approaches}
-
-\subsubsection{Backend Debugging}
-
-\begin{enumerate}
-    \item \textbf{Database Connection Testing}
-    \begin{itemize}
-        \item Verified PostgreSQL connectivity with \texttt{python -m models.database}
-        \item Checked Redis connectivity with \texttt{python -m services.cache}
-        \item Used \texttt{docker-compose logs postgres} to diagnose initialization issues
-    \end{itemize}
-
-    \item \textbf{API Endpoint Testing}
-    \begin{itemize}
-        \item Manual testing with \texttt{curl} and browser DevTools
-        \item FastAPI automatic documentation at \texttt{http://localhost:8000/docs}
-        \item Example: \texttt{curl "http://localhost:8000/api/standings" | jq .}
-    \end{itemize}
-
-    \item \textbf{Data Ingestion Debugging}
-    \begin{itemize}
-        \item Added comprehensive logging with timestamps and record counts
-        \item Monitored \texttt{ingestion\_logs} table for failures
-        \item Handled NBA API KeyError exceptions for missing fields (lines 347-359 in \texttt{data\_ingestion.py})
-        \item Gracefully skipped malformed live game responses
-    \end{itemize}
-
-    \item \textbf{Cache Debugging}
-    \begin{itemize}
-        \item Used \texttt{redis-cli} to inspect cached keys: \texttt{KEYS standings:*}
-        \item Cleared stale cache when schema changed: \texttt{DEL "standings:2025-26"}
-        \item Monitored cache hit/miss rates in API logs
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection{Frontend Debugging}
-
-\begin{enumerate}
-    \item \textbf{Next.js Build Issues}
-    \begin{itemize}
-        \item Checked \texttt{npm} logs for dependency conflicts
-        \item Used \texttt{next build} to catch TypeScript errors before runtime
-        \item Configured \texttt{next.config.ts} to whitelist external image domains
-    \end{itemize}
-
-    \item \textbf{Runtime Errors}
-    \begin{itemize}
-        \item Browser console for React component errors
-        \item Network tab to inspect API responses and CORS issues
-        \item React DevTools to examine component state and props
-    \end{itemize}
-
-    \item \textbf{Common Fixes Applied}
-    \begin{itemize}
-        \item Fixed percentage formatting (removed duplicate $\times$100 multiplication)
-        \item Added missing \texttt{ZAxis} import for shot heatmap
-        \item Resolved team ID mismatch (internal vs. NBA IDs for logos)
-        \item Applied \texttt{formatGameClock()} helper for PT time format conversion
-    \end{itemize}
-\end{enumerate}
-
-\subsection{Testing Mechanisms}
-
-\subsubsection{Unit Testing}
-
-We implemented pytest-based unit tests for core backend functions:
-
-\begin{lstlisting}[language=Python, caption=Example Test Case]
-# tests/test_api.py
-def test_standings_endpoint(client):
-    response = client.get("/api/standings")
-    assert response.status_code == 200
-    data = response.json()
-    assert "east" in data
-    assert "west" in data
-    assert len(data["east"]) == 15  # 15 teams per conference
-
-def test_cache_hit(client, redis_client):
-    # First request - cache miss
-    response1 = client.get("/api/standings")
-
-    # Second request - should hit cache
-    response2 = client.get("/api/standings")
-
-    assert response1.json() == response2.json()
-    assert redis_client.exists("standings:2025-26")
-\end{lstlisting}
-
-\noindent\textbf{Test Coverage:}
-\begin{itemize}
-    \item API endpoints: 85\% coverage
-    \item Database models: 90\% coverage
-    \item Data ingestion: 70\% coverage (NBA API mocked)
-    \item Cache layer: 95\% coverage
-\end{itemize}
-
-\subsubsection{Integration Testing}
-
-\begin{enumerate}
-    \item \textbf{End-to-End Data Flow:} Ingestion $\rightarrow$ Database $\rightarrow$ API $\rightarrow$ Frontend
-    \item \textbf{Live Game Updates:} Verified 15-second auto-refresh on live game page
-    \item \textbf{Concurrent User Simulation:} Apache Bench (ab) with 50 concurrent requests
-    \item \textbf{Cross-Browser Testing:} Chrome, Firefox, Safari on macOS
-\end{enumerate}
-
-\subsubsection{Manual Testing Scenarios}
-
-\begin{table}[H]
-\centering
-\caption{Manual Test Cases}
+\caption{Manual end-to-end test cases.}
+\label{tab:manual_tests}
 \begin{tabular}{@{}lp{6cm}l@{}}
 \toprule
-\textbf{Feature} & \textbf{Test Case} & \textbf{Result} \\ \midrule
-Standings & Load page, verify rankings match NBA.com & Pass \\
-Leaders & Change category dropdown, check top 10 updates & Pass \\
-Live Game & Select game, verify shot chart renders, test filters & Pass \\
-Team Analysis & Select team, confirm 365-day history loads & Pass \\
-Shot Chart 3D & Drag to rotate, scroll to zoom, hover for tooltips & Pass \\
-Player Filter & Select player, verify headshot displays below dropdown & Pass \\
-Quarterly Scores & Confirm period-by-period table matches actual scores & Pass \\
+\textbf{Feature} & \textbf{Test Case} \\\midrule 
+Standings & Load page, verify rankings match NBA.com \\
+Leaders & Change category dropdown, check top 10 updates \\
+Live Game & Select game, verify shot chart renders, test player filters, verify quarterly scores \\
+Team Analysis & Select team, confirm game history loads \\
+Shot Chart 3D & Drag to rotate, scroll to zoom, hover for tooltips \\
+Player Filter & Select player, verify headshot displays below dropdown \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Performance Profiling}
-
-\begin{itemize}
-    \item \textbf{PostgreSQL Query Timing:} Used \texttt{EXPLAIN ANALYZE} to optimize slow queries
-    \item \textbf{API Response Time:} FastAPI middleware logged request duration
-    \item \textbf{Frontend Rendering:} React Profiler identified re-render bottlenecks
-    \item \textbf{Network Latency:} Browser DevTools Network tab measured TTFB (Time to First Byte)
-\end{itemize}
-
-\section*{System Performance and Bottlenecks}
-
-\subsection{Current Workload Capacity}
-
-\subsubsection{Request Throughput}
+We used FastAPI middleware to profile our API performance (Table~\ref{tab:api_performance}).
 
 \begin{table}[H]
 \centering
-\caption{API Endpoint Performance Benchmarks}
+\caption{API endpoint performance profiling results.}
+\label{tab:api_performance}
 \begin{tabular}{@{}lccc@{}}
 \toprule
 \textbf{Endpoint} & \textbf{Avg Latency} & \textbf{Cache Hit} & \textbf{Cache Miss} \\ \midrule
@@ -556,113 +231,16 @@ Quarterly Scores & Confirm period-by-period table matches actual scores & Pass \
 \end{tabular}
 \end{table}
 
-\noindent\textbf{Concurrent User Testing (Apache Bench):}
-\begin{lstlisting}[language=bash]
-ab -n 1000 -c 50 http://localhost:8000/api/standings
+\section{Capabilities and limitations}
 
-Results:
-- Total requests: 1000
-- Concurrency level: 50
-- Time taken: 8.2 seconds
-- Requests per second: 122.0
-- Mean latency: 410ms (includes queue time)
-- 95th percentile: 680ms
-- Failed requests: 0
-\end{lstlisting}
-
-\noindent\textbf{Interpretation:} The system comfortably handles 50-100 concurrent users with acceptable latency. Cache hit rate during the test was 82\%, demonstrating effective caching strategy.
-
-\subsubsection{Data Volume Scaling}
-
-\begin{itemize}
-    \item \textbf{Current Database Size:} 1.2GB (2 seasons, 1,230 games, 15,000+ player-game records)
-    \item \textbf{Projected Growth:} +600MB per season (82 games $\times$ 30 teams $\times$ 12 players/game)
-    \item \textbf{Query Performance:} Remains sub-200ms for up to 10 million rows with proper indexing
-    \item \textbf{Redis Memory Usage:} 120MB (mostly standings and leaders, eviction policy: \texttt{allkeys-lru})
-\end{itemize}
-
-\subsection{Identified Bottlenecks}
-
-\subsubsection{1. NBA API Rate Limiting}
-
-\textbf{Issue:} The NBA Stats API enforces strict rate limits, requiring 0.6-second delays between requests.
-
-\noindent\textbf{Impact:}
-\begin{itemize}
-    \item Full season ingestion takes $\sim$20 minutes (82 games $\times$ 0.6s $\times$ 30 teams)
-    \item Live game updates limited to every 30 seconds minimum
-    \item Cannot parallelize ingestion across multiple workers
-\end{itemize}
-
-\noindent\textbf{Mitigation:}
-\begin{itemize}
-    \item Implemented exponential backoff retry logic for 429 errors
-    \item Prioritize recent/live games over historical data
-    \item Cache aggressively to minimize API calls
-\end{itemize}
-
-\subsubsection{2. Database Query Complexity}
-
-\textbf{Issue:} Some queries require multiple joins and aggregations, especially for player statistics.
-
-\noindent\textbf{Slow Query Example:}
-\begin{lstlisting}[language=SQL]
--- Get top scorers with team info (executed on cache miss)
-SELECT p.first_name, p.last_name, t.abbreviation,
-       AVG(pgs.points) as ppg, AVG(pgs.minutes) as mpg
-FROM player_game_stats pgs
-JOIN players p ON pgs.player_id = p.id
-JOIN teams t ON p.team_id = t.id
-GROUP BY p.id, t.abbreviation
-ORDER BY ppg DESC
-LIMIT 10;
--- Execution time: ~180ms (1,000,000 rows)
-\end{lstlisting}
-
-\noindent\textbf{Optimization:}
-\begin{itemize}
-    \item Added composite indexes on \texttt{(player\_id, game\_id)}
-    \item Increased Redis TTL for leaders endpoint to 1 hour
-    \item Considered materialized views for pre-computed aggregates (future work)
-\end{itemize}
-
-\subsubsection{3. Frontend Asset Loading}
-
-\textbf{Issue:} Plotly.js library is 3.2MB, causing slow initial page load.
-
-\noindent\textbf{Impact:}
-\begin{itemize}
-    \item First Contentful Paint (FCP): 2.1 seconds on 3G network
-    \item Largest Contentful Paint (LCP): 3.5 seconds
-\end{itemize}
-
-\noindent\textbf{Mitigation:}
-\begin{itemize}
-    \item Used \texttt{dynamic import} with \texttt{ssr: false} to defer loading
-    \item Lazy load 3D shot chart only when Live Game tab is active
-    \item Implemented code splitting per Next.js route
-    \item Result: Initial bundle reduced from 4.8MB to 1.2MB
-\end{itemize}
-
-\subsubsection{4. Redis Memory Constraints}
-
-\textbf{Issue:} Live game shot charts with 200+ shots per game consume significant cache memory.
-
-\noindent\textbf{Analysis:}
-\begin{itemize}
-    \item Single game shot chart: $\sim$80KB JSON
-    \item Peak usage during 15 simultaneous games: 1.2MB (shots only)
-    \item Total cache memory: 120MB with default 2GB Redis limit
-\end{itemize}
-
-\noindent\textbf{Future Risk:} If caching increases to include historical shot charts (10,000 games $\times$ 80KB = 800MB), may approach Redis memory limit.
-
-\noindent\textbf{Mitigation:}
-\begin{itemize}
-    \item Set aggressive TTL for shot charts (30 seconds for live, 5 minutes for final)
-    \item Configure Redis \texttt{maxmemory-policy allkeys-lru} to evict least-recently-used keys
-    \item Monitor memory usage with \texttt{INFO memory} command
-\end{itemize}
+With two seasons worth of game and player data (24-25 and 25-26), our database is currently 1.2GB, which we project to grow by about 600MB per additional season of stored data. 
+The Redis cache currently uses about 120MB, which consists mostly of standings and stat leaders data.
+The primary bottleneck is the cost of ingesting data from the NBA Stats API: with a rate limit of 2 queries/second, ingesting a full season of data takes about twenty minutes. 
+However, once we have ingested the data to the database, it persists, so we only incur this cost once up front. 
+Another bottleneck is querying the players data (1M rows) to compute the player statistics leaders. 
+These queries take up to 200ms, so we set the Redis TTL to 1 hour for the leaders endpoint to reduce the number of such queries.
+Finally, although we like the customizability and interactivity of Plotly.js, the Plotly library is large and slows down the initial page load. 
+To address this, we turn off server-side rendering and lazy load the 3D shot chart and shot heatmaps.
 
 \subsection{Scalability Analysis}
 
@@ -702,7 +280,7 @@ LIMIT 10;
     \item \textbf{Future Work:} Integrate Prometheus + Grafana for real-time dashboards
 \end{itemize}
 
-\section*{Lessons Learned}
+\section{Lessons Learned}
 
 \subsection{Technical Challenges}
 
@@ -725,35 +303,18 @@ LIMIT 10;
     \item \textbf{Git Workflow:} Feature branches + pull requests for code review
 \end{itemize}
 
-\section*{Future Enhancements}
+\section{Conclusions and Future Work}
 
-\begin{enumerate}
-    \item \textbf{Machine Learning Predictions:} Train models on historical data to predict game outcomes
-    \item \textbf{WebSocket Live Updates:} Push notifications instead of polling every 15 seconds
-    \item \textbf{User Accounts:} Save favorite teams, custom dashboards, betting predictions
-    \item \textbf{Mobile App:} React Native version for iOS/Android
-    \item \textbf{Advanced Analytics:} Player efficiency ratings, lineup analysis, trade simulations
-    \item \textbf{Kubernetes Deployment:} Auto-scaling based on traffic patterns
-    \item \textbf{CDN Integration:} CloudFront/Cloudflare for global asset distribution
-\end{enumerate}
+The 8 Ball platform provides real-time cloud-hosted NBA analytics, allowing users to follow their favorite teams and players over the course of a season and even track live games.
+To improve our application, we would first add horizontal scaling, increasing the number of workers based on the number of recent requests. 
+We would also implement the prediction endpoints we discussed in our proposal for predicting game outcomes, season standings, and in-game events like scores and injuries. 
 
-\section*{Conclusion}
+\section*{Acknowledgments}
 
-The 8 Ball platform successfully demonstrates datacenter-scale computing principles through a real-world NBA analytics application. Key achievements include:
+We thank the maintainers of the excellent \texttt{nba\_api} NBA Stats API wrapper for Python.
 
-\begin{itemize}
-    \item \textbf{Scalable Architecture:} Four-tier design supports horizontal scaling
-    \item \textbf{Performance Optimization:} 85\%+ cache hit rate, sub-150ms average latency
-    \item \textbf{Modern Tech Stack:} Next.js + FastAPI + PostgreSQL + Redis
-    \item \textbf{Production-Ready:} Dockerized, tested, documented, and monitored
-\end{itemize}
 
-\noindent The system currently handles 50+ concurrent users with room to scale to 500+ through horizontal scaling. Primary bottleneck is NBA API rate limiting (external dependency), not internal infrastructure. The modular architecture allows individual components to scale independently based on demand.
 
-\noindent This project provided hands-on experience with distributed systems concepts including caching strategies, database normalization, API design, containerization, and frontend-backend integration. The codebase is production-ready and could be deployed to AWS/GCP with minimal modifications.
-
-\section**{Acknowledgments}
-
-We thank the course staff for guidance on datacenter architecture, our peers for code reviews and testing, and the \texttt{nba\_api} maintainers for the excellent NBA Stats API wrapper.
-
+\appendix
+\include{appendix}
 \end{document}

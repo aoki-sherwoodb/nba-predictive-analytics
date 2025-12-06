@@ -1,0 +1,308 @@
+% Beamer Presentation for 8 Ball NBA Analytics Platform
+% CSCI 5253 Datacenter Scale Computing - Final Project
+% ~5 minute presentation with 3+ minute live demo
+
+\documentclass[aspectratio=169]{beamer}
+
+% Theme and Color
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+
+% Packages
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{tikz}
+
+% Title Information
+\title{\textbf{8 Ball}}
+\subtitle{Real-Time NBA Analytics Platform}
+\author{Ben Aoki-Sherwood \and Arjun Ashok Rao}
+\institute{CSCI 5253: Datacenter Scale Computing \\ University of Colorado Boulder}
+\date{December 2025}
+
+% Remove navigation symbols
+\setbeamertemplate{navigation symbols}{}
+
+% Footer with slide numbers
+\setbeamertemplate{footline}[frame number]
+
+\begin{document}
+
+% =============================================================================
+% TITLE SLIDE
+% =============================================================================
+\begin{frame}
+\titlepage
+\end{frame}
+
+% =============================================================================
+% PROBLEM STATEMENT
+% =============================================================================
+\begin{frame}{What is 8 Ball?}
+
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Problem:}
+\begin{itemize}
+    \item NBA fans want real-time stats and analytics
+    \item Existing platforms lack interactive visualizations
+    \item Need scalable cloud infrastructure
+\end{itemize}
+
+\vspace{1em}
+\textbf{Solution:}
+\begin{itemize}
+    \item Real-time data ingestion from NBA API
+    \item Interactive 3D shot charts and heatmaps
+    \item Cloud-native architecture on GCP
+\end{itemize}
+\end{column}
+
+\begin{column}{0.5\textwidth}
+\textbf{Tech Stack:}
+\begin{itemize}
+    \item \textbf{Backend:} Python, FastAPI, PostgreSQL, Redis
+    \item \textbf{Frontend:} Next.js, TypeScript, Material-UI
+    \item \textbf{Cloud:} GCP Cloud Run, Cloud SQL, Memorystore
+    \item \textbf{IaC:} Terraform, Docker
+\end{itemize}
+
+\vspace{1em}
+\textbf{GitHub:} \href{https://github.com/cu-csci-4253-datacenter-fall-2025/final-project-aoki-sherwoodb}{\textcolor{blue}{final-project-aoki-sherwoodb}}
+\end{column}
+\end{columns}
+
+\end{frame}
+
+% =============================================================================
+% SYSTEM ARCHITECTURE
+% =============================================================================
+\begin{frame}{System Architecture}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.85\textwidth]{sys_diagram_nba.png}
+\caption{Datacenter-scale architecture with microservices, caching, and auto-scaling}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Ingestion:} NBA API $\rightarrow$ PostgreSQL + Redis (0.6s rate limit)
+    \item \textbf{API:} FastAPI cache-first queries (85\%+ hit rate, <150ms avg)
+    \item \textbf{Frontend:} Next.js client-side rendering with auto-refresh
+    \item \textbf{Cloud:} Auto-scaling Cloud Run (0-10 API, 0-5 frontend instances)
+\end{itemize}
+
+\end{frame}
+
+% =============================================================================
+% KEY FEATURES
+% =============================================================================
+\begin{frame}{Key Features Implemented}
+
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Data \& Analytics:}
+\begin{itemize}
+    \item 5 seasons of historical data (2021-2026)
+    \item Live game updates every 15-30 seconds
+    \item Statistical leaders (PTS, REB, AST, STL, BLK)
+    \item Conference standings with streaks
+    \item Team performance analysis
+\end{itemize}
+\end{column}
+
+\begin{column}{0.5\textwidth}
+\textbf{Visualizations:}
+\begin{itemize}
+    \item \textbf{3D Shot Charts:} Plotly.js with parabolic arcs
+    \item \textbf{2D Heatmaps:} Recharts with full court rendering
+    \item \textbf{Play-by-Play:} Real-time event feed with icons
+    \item \textbf{Box Scores:} Quarterly scoring tables
+    \item \textbf{Team Trends:} Point differential over season
+\end{itemize}
+\end{column}
+\end{columns}
+
+\vspace{1em}
+\begin{center}
+\textbf{\large Live Demo Time!}
+\end{center}
+
+\end{frame}
+
+% =============================================================================
+% PERFORMANCE METRICS
+% =============================================================================
+\begin{frame}{Performance \& Scalability}
+
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\textbf{API Performance:}
+
+\vspace{0.5em}
+\begin{table}
+\scriptsize
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Endpoint} & \textbf{Cache Hit} & \textbf{Cache Miss} \\ \midrule
+\texttt{/standings} & 45ms & 180ms \\
+\texttt{/leaders} & 70ms & 250ms \\
+\texttt{/games/live} & 50ms & 200ms \\
+\texttt{/shots} & 80ms & 350ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.5em}
+\textbf{Database Growth:}
+\begin{itemize}
+    \item Current: 1.2GB (2 seasons)
+    \item Projection: +600MB per season
+    \item Player stats: 1M rows
+\end{itemize}
+\end{column}
+
+\begin{column}{0.45\textwidth}
+\textbf{Bottlenecks:}
+\begin{enumerate}
+    \item NBA API rate limit (0.6s/req)
+    \item Statistical leader queries (200ms)
+    \item Plotly.js bundle size (3MB)
+\end{enumerate}
+
+\vspace{0.5em}
+\textbf{Solutions:}
+\begin{itemize}
+    \item Redis caching (1hr TTL for leaders)
+    \item Lazy loading for 3D charts
+    \item Incremental ingestion mode
+    \item Client-side rendering
+\end{itemize}
+\end{column}
+\end{columns}
+
+\end{frame}
+
+% =============================================================================
+% LESSONS LEARNED
+% =============================================================================
+\begin{frame}{Lessons Learned \& Future Work}
+
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Technical Challenges:}
+\begin{itemize}
+    \item NBA API inconsistencies (null fields in live data)
+    \item Time zone conversions (UTC $\rightarrow$ Eastern)
+    \item Redis schema migrations during development
+    \item CORS configuration for frontend-backend
+\end{itemize}
+
+\vspace{0.5em}
+\textbf{Best Practices:}
+\begin{itemize}
+    \item Pydantic type safety caught 15+ bugs
+    \item Docker Compose for one-command dev setup
+    \item Terraform for reproducible infrastructure
+\end{itemize}
+\end{column}
+
+\begin{column}{0.5\textwidth}
+\textbf{Future Enhancements:}
+\begin{enumerate}
+    \item \textbf{ML Predictions:} LSTM models for game outcomes
+    \item \textbf{Horizontal Scaling:} Multi-instance API + read replicas
+    \item \textbf{Monitoring:} Prometheus + Grafana dashboards
+    \item \textbf{Real-time Alerts:} WebSocket push for live scores
+    \item \textbf{Player Comparisons:} Side-by-side stat analysis
+\end{enumerate}
+\end{column}
+\end{columns}
+
+\vspace{1em}
+\begin{center}
+\Large{\textbf{Thank You! Questions?}}
+\end{center}
+
+\end{frame}
+
+% =============================================================================
+% BACKUP SLIDE: TERRAFORM MODULES
+% =============================================================================
+\begin{frame}[noframenumbering]{Backup: Infrastructure as Code}
+
+\textbf{Terraform Modules (6 total):}
+
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\begin{itemize}
+    \item \texttt{networking/} - VPC, subnets, connector
+    \item \texttt{database/} - Cloud SQL PostgreSQL
+    \item \texttt{cache/} - Memorystore Redis
+\end{itemize}
+\end{column}
+
+\begin{column}{0.5\textwidth}
+\begin{itemize}
+    \item \texttt{cloud\_run/} - API \& frontend services
+    \item \texttt{scheduler/} - Cron jobs for ingestion
+    \item \texttt{storage/} - Cloud Storage buckets
+\end{itemize}
+\end{column}
+\end{columns}
+
+\vspace{1em}
+\textbf{GCP Services Enabled:}
+\begin{itemize}
+    \item Cloud Run, Cloud SQL, Memorystore, Cloud Storage, Artifact Registry
+    \item VPC Access, Secret Manager, Cloud Scheduler, Cloud Build, IAM
+\end{itemize}
+
+\vspace{0.5em}
+\textbf{One-Command Deployment:}
+\begin{itemize}
+    \item \texttt{terraform init \&\& terraform apply}
+    \item Outputs: API URL, Frontend URL, Database connection string
+\end{itemize}
+
+\end{frame}
+
+% =============================================================================
+% BACKUP SLIDE: DATABASE SCHEMA
+% =============================================================================
+\begin{frame}[noframenumbering]{Backup: Database Schema}
+
+\textbf{Normalized PostgreSQL Schema (6 tables):}
+
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Core Entities:}
+\begin{itemize}
+    \item \texttt{teams} - NBA franchises (30 teams)
+    \item \texttt{players} - Active roster (450+ players)
+    \item \texttt{games} - Game metadata (1,230 per season)
+\end{itemize}
+\end{column}
+
+\begin{column}{0.5\textwidth}
+\textbf{Statistics:}
+\begin{itemize}
+    \item \texttt{player\_game\_stats} - Box scores (1M rows)
+    \item \texttt{team\_standings} - Daily standings snapshots
+    \item \texttt{ingestion\_log} - Data pipeline audit trail
+\end{itemize}
+\end{column}
+\end{columns}
+
+\vspace{1em}
+\textbf{Indexes:}
+\begin{itemize}
+    \item \texttt{idx\_games\_date} - Fast date range queries
+    \item \texttt{idx\_player\_stats\_game} - Efficient box score lookups
+    \item \texttt{idx\_standings\_team\_date} - Historical standings retrieval
+\end{itemize}
+
+\end{frame}
+
+\end{document}

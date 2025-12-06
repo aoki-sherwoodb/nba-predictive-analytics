@@ -5,8 +5,11 @@ This directory contains the LaTeX source for the final project report.
 ## Contents
 
 - `project_report.tex` - Main LaTeX document with comprehensive project documentation
+- `presentation.tex` - Beamer slides for 5-minute presentation with live demo
 
-## Compiling the Report
+## Compiling the Documents
+
+### Compiling the Report
 
 ### Prerequisites
 
@@ -41,7 +44,36 @@ pdflatex project_report.tex
 rm -f *.aux *.log *.out *.toc
 ```
 
-### Output
+### Compiling the Presentation
+
+```bash
+cd report
+
+# Compile Beamer slides
+pdflatex presentation.tex
+
+# Run twice for proper slide numbers
+pdflatex presentation.tex
+pdflatex presentation.tex
+
+# Clean auxiliary files
+rm -f *.aux *.log *.out *.nav *.snm *.toc
+```
+
+The presentation outputs `presentation.pdf` with:
+- 6 main slides (2 minutes of talking)
+- Space for 3+ minute live demo
+- 2 backup slides for Q&A
+
+**Presentation Structure:**
+1. Title slide with team members
+2. Problem statement and tech stack
+3. System architecture diagram
+4. Key features (transitions to live demo)
+5. Performance metrics and bottlenecks
+6. Lessons learned and future work
+
+### Report Output
 
 The compilation produces `project_report.pdf` which includes:
 
@@ -103,7 +135,9 @@ The TikZ diagram is in Section 4.1 (lines 240-310). You can:
 - Adjust positions: `below=of`, `below left=1.5cm and 1cm of`
 - Modify arrow styles: `arrow/.style={-{Stealth[length=3mm]}, thick}`
 
-## Report Sections Summary
+## Document Structure
+
+### Report Sections Summary
 
 | Section | Content | Pages |
 |---------|---------|-------|
@@ -117,6 +151,22 @@ The TikZ diagram is in Section 4.1 (lines 240-310). You can:
 | 9-11 | Lessons, Future Work, Conclusion | 2 |
 
 **Total: ~22 pages**
+
+### Presentation Slides Summary
+
+| Slide # | Content | Time |
+|---------|---------|------|
+| 1 | Title and team information | 10s |
+| 2 | Problem statement and tech stack | 30s |
+| 3 | System architecture diagram | 30s |
+| 4 | Key features (transition to demo) | 20s |
+| 5 | Performance metrics and bottlenecks | 30s |
+| 6 | Lessons learned and future work | 20s |
+| Backup 1 | Infrastructure as Code details | - |
+| Backup 2 | Database schema details | - |
+
+**Total Slides: 6 main + 2 backup**
+**Talk Time: ~2 minutes + 3 minute demo = 5 minutes**
 
 ## Common LaTeX Errors
 
